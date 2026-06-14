@@ -1,360 +1,321 @@
 import { useState } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { trpc } from "@/lib/trpc";
-import { ArrowRight, ArrowLeft, Users, Zap } from "lucide-react";
+import { Trophy, Upload, Users, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
 
-type Step = "details" | "participants" | "draw";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+import {
+  createPool,
+  addParticipants,
+  runDraw,
+  getMaxParticipants,
+} from "@/lib/store";
 
 export default function CreatePool() {
-  const { isAuthenticated } = useAuth();
-  const [, setLocation] = useLocation();
-  const [step, setStep] = useState<Step>("details");
+  const [, navigate] = useLocation();
 
-  // Form state
+  const [step, setStep] = useState(1);
+
   const [poolName, setPoolName] = useState("");
-  const [entryFee, setEntryFee] = useState("0");
-  const [currency, setCurrency] = useState("USD");
-  const [maxParticipants, setMaxParticipants] = useState("8");
-
-  const [participants, setParticipants] = useState<string[]>([]);
-  const [participantInput, setParticipantInput] = useState("");
+  const [organizerName, setOrganizerName] = useState("");
 
   const [poolSlug, setPoolSlug] = useState("");
-  const [poolId, setPoolId] = useState<number | null>(null);
+  const [plan] = useState<"free" | "pro" | "premium">("free");
 
-  // API calls
-  const createPoolMutation = trpc.pools.create.useMutation();
-  const addParticipantMutation = trpc.participants.add.useMutation();
-  const executDrawMutation = trpc.draw.execute.useMutation();
+  const [participantInput, setParticipantInput] = useState("");
+  const [participants, setParticipants] = useState<string[]>([]);
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-white mb-4">Access Denied</h1>
-          <p className="text-slate-300 mb-6">Please sign in to create a pool.</p>
-          <Button onClick={() => setLocation("/")} className="bg-amber-500 hover:bg-amber-600 text-white">
-            Go Home
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const [drawing, setDrawing] = useState(false);
 
-  const handleCreatePool = async () => {
-    if (!poolName.trim()) {
-      toast.error("Please enter a pool name");
+  const limit = getMaxParticipants(plan);
+
+  const handleCreatePool = () => {
+    if (!poolName.trim() || !organizerName.trim()) {
+      toast.error("Please complete all fields");
       return;
     }
 
-    try {
-      const result = await createPoolMutation.mutateAsync({
-        name: poolName,
-        entryFee,
-        currency,
-        maxParticipants: parseInt(maxParticipants),
-      });
+    const pool = createPool({
+      name: poolName,
+      organizerName,
+      plan,
+    });
 
-      setPoolSlug(result.slug);
-      setPoolId(result.poolId);
-      setStep("participants");
-      toast.success("Pool created! Now add participants.");
-    } catch (error) {
-      toast.error("Failed to create pool");
-      console.error(error);
-    }
+    setPoolSlug(pool.slug);
+    setStep(2);
+
+    toast.success("Pool created");
   };
 
-  const handleAddParticipant = () => {
-    if (!participantInput.trim()) {
-      toast.error("Please enter a participant name");
+  const addParticipant = () => {
+    const value = participantInput.trim();
+
+    if (!value) return;
+
+    if (participants.includes(value)) {
+      toast.error("Participant already added");
       return;
     }
 
-    if (participants.length >= parseInt(maxParticipants)) {
-      toast.error(`Pool is full (max ${maxParticipants} participants)`);
+    if (participants.length >= limit) {
+      toast.error(`Free plan supports ${limit} participants`);
       return;
     }
 
-    setParticipants([...participants, participantInput]);
+    setParticipants([...participants, value]);
     setParticipantInput("");
-    toast.success("Participant added");
   };
 
-  const handleRemoveParticipant = (index: number) => {
-    setParticipants(participants.filter((_, i) => i !== index));
+  const handleCSVUpload = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const text = String(reader.result);
+
+      const names = text
+        .split(/[\n,]/)
+        .map((n) => n.trim())
+        .filter(Boolean);
+
+      const merged = [...new Set([...participants, ...names])].slice(
+        0,
+        limit
+      );
+
+      setParticipants(merged);
+
+      toast.success(`${names.length} names imported`);
+    };
+
+    reader.readAsText(file);
   };
 
-  const handleAddParticipants = async () => {
-    if (participants.length === 0) {
-      toast.error("Please add at least one participant");
+  const saveParticipants = () => {
+    if (!participants.length) {
+      toast.error("Add at least one participant");
       return;
     }
 
-    try {
-      if (!poolId) {
-        toast.error("Pool ID not found");
-        return;
-      }
+    addParticipants(poolSlug, participants);
 
-      for (const name of participants) {
-        await addParticipantMutation.mutateAsync({
-          poolId,
-          name,
-          paymentStatus: "free",
-        });
-      }
+    setStep(3);
 
-      setStep("draw");
-      toast.success("Participants added! Ready to draw teams.");
-    } catch (error) {
-      toast.error("Failed to add participants");
-      console.error(error);
-    }
+    toast.success("Participants added");
   };
 
-  const handleExecuteDraw = async () => {
-    if (!poolId) {
-      toast.error("Pool ID not found");
-      return;
-    }
-
+  const handleDraw = async () => {
     try {
-      await executDrawMutation.mutateAsync({
-        poolId,
-      });
+      setDrawing(true);
 
-      toast.success("Teams drawn! Redirecting to pool...");
-      setTimeout(() => {
-        setLocation(`/pool/${poolSlug}`);
-      }, 1000);
-    } catch (error) {
-      toast.error("Failed to execute draw");
-      console.error(error);
+      await new Promise((r) => setTimeout(r, 1500));
+
+      runDraw(poolSlug);
+
+      toast.success("Draw completed");
+    } catch {
+      toast.error("Unable to run draw");
+    } finally {
+      setDrawing(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Navigation */}
-      <nav className="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-white">Sweepstake Pro</span>
+    <div className="min-h-screen bg-slate-900 text-white p-6">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold">
+            Create Sweepstake Pool
+          </h1>
+
+          <div className="mt-6 h-3 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-amber-400 transition-all"
+              style={{
+                width: `${(step / 3) * 100}%`,
+              }}
+            />
           </div>
-          <Button
-            onClick={() => setLocation("/dashboard")}
-            variant="outline"
-            className="border-slate-600 text-white hover:bg-slate-700"
-          >
-            Back to Dashboard
-          </Button>
-        </div>
-      </nav>
 
-      {/* Main Content */}
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Progress Indicator */}
-        <div className="flex justify-between mb-12">
-          {["details", "participants", "draw"].map((s, idx) => (
-            <div key={s} className="flex items-center">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                  step === s
-                    ? "bg-amber-500 text-white"
-                    : ["details", "participants", "draw"].indexOf(step) > idx
-                      ? "bg-green-500 text-white"
-                      : "bg-slate-700 text-slate-400"
-                }`}
-              >
-                {idx + 1}
-              </div>
-              {idx < 2 && (
-                <div
-                  className={`h-1 flex-1 mx-2 ${
-                    ["details", "participants", "draw"].indexOf(step) > idx ? "bg-green-500" : "bg-slate-700"
-                  }`}
-                />
-              )}
-            </div>
-          ))}
+          <div className="flex justify-between mt-2 text-sm text-slate-400">
+            <span>Pool</span>
+            <span>Participants</span>
+            <span>Draw</span>
+          </div>
         </div>
 
-        {/* Step 1: Pool Details */}
-        {step === "details" && (
-          <Card className="bg-slate-700/50 border-slate-600 p-8">
-            <h2 className="text-3xl font-bold text-white mb-6">Create Your Pool</h2>
+        {step === 1 && (
+          <Card className="bg-slate-800 border-slate-700">
+            <CardHeader>
+              <CardTitle>Step 1 — Pool Details</CardTitle>
+            </CardHeader>
 
-            <div className="space-y-6">
+            <CardContent className="space-y-4">
               <div>
-                <Label className="text-white mb-2 block">Pool Name</Label>
+                <Label>Pool Name</Label>
                 <Input
                   value={poolName}
-                  onChange={(e) => setPoolName(e.target.value)}
-                  placeholder="e.g., Office World Cup 2026"
-                  className="bg-slate-600 border-slate-500 text-white placeholder:text-slate-400"
+                  onChange={(e) =>
+                    setPoolName(e.target.value)
+                  }
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-white mb-2 block">Entry Fee</Label>
-                  <Input
-                    value={entryFee}
-                    onChange={(e) => setEntryFee(e.target.value)}
-                    type="number"
-                    placeholder="0"
-                    className="bg-slate-600 border-slate-500 text-white placeholder:text-slate-400"
-                  />
-                </div>
-                <div>
-                  <Label className="text-white mb-2 block">Currency</Label>
-                  <select
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-600 border border-slate-500 text-white rounded-md"
-                  >
-                    <option>USD</option>
-                    <option>EUR</option>
-                    <option>GBP</option>
-                    <option>NGN</option>
-                  </select>
-                </div>
               </div>
 
               <div>
-                <Label className="text-white mb-2 block">Max Participants</Label>
+                <Label>Organizer Name</Label>
                 <Input
-                  value={maxParticipants}
-                  onChange={(e) => setMaxParticipants(e.target.value)}
-                  type="number"
-                  min="2"
-                  max="32"
-                  className="bg-slate-600 border-slate-500 text-white placeholder:text-slate-400"
+                  value={organizerName}
+                  onChange={(e) =>
+                    setOrganizerName(e.target.value)
+                  }
                 />
-                <p className="text-sm text-slate-400 mt-2">Maximum 32 (one per team)</p>
               </div>
-            </div>
 
-            <div className="flex gap-4 mt-8">
               <Button
-                onClick={() => setLocation("/dashboard")}
-                variant="outline"
-                className="flex-1 border-slate-600 text-white hover:bg-slate-600"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Cancel
-              </Button>
-              <Button
+                className="w-full bg-amber-400 text-black"
                 onClick={handleCreatePool}
-                disabled={createPoolMutation.isPending}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"
               >
-                {createPoolMutation.isPending ? "Creating..." : "Next: Add Participants"}
-                <ArrowRight className="w-4 h-4 ml-2" />
+                Continue
               </Button>
-            </div>
+            </CardContent>
           </Card>
         )}
 
-        {/* Step 2: Add Participants */}
-        {step === "participants" && (
-          <Card className="bg-slate-700/50 border-slate-600 p-8">
-            <h2 className="text-3xl font-bold text-white mb-2">Add Participants</h2>
-            <p className="text-slate-400 mb-6">
-              Add {participants.length}/{maxParticipants} participants
-            </p>
+        {step === 2 && (
+          <Card className="bg-slate-800 border-slate-700">
+            <CardHeader>
+              <CardTitle>
+                Step 2 — Add Participants
+              </CardTitle>
+            </CardHeader>
 
-            <div className="space-y-4 mb-6">
+            <CardContent className="space-y-5">
               <div className="flex gap-2">
                 <Input
+                  placeholder="Participant name"
                   value={participantInput}
-                  onChange={(e) => setParticipantInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleAddParticipant()}
-                  placeholder="Enter participant name"
-                  className="bg-slate-600 border-slate-500 text-white placeholder:text-slate-400"
+                  onChange={(e) =>
+                    setParticipantInput(e.target.value)
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addParticipant();
+                    }
+                  }}
                 />
-                <Button
-                  onClick={handleAddParticipant}
-                  disabled={participants.length >= parseInt(maxParticipants)}
-                  className="bg-amber-500 hover:bg-amber-600 text-white"
-                >
+
+                <Button onClick={addParticipant}>
                   Add
                 </Button>
               </div>
 
-              {participants.length > 0 && (
-                <div className="bg-slate-600/50 rounded-lg p-4">
-                  <div className="space-y-2">
-                    {participants.map((name, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-white">
-                        <span>{name}</span>
-                        <button
-                          onClick={() => handleRemoveParticipant(idx)}
-                          className="text-red-400 hover:text-red-300 text-sm"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+              <div>
+                <Label>Upload CSV</Label>
+
+                <Input
+                  type="file"
+                  accept=".csv,.txt"
+                  onChange={handleCSVUpload}
+                />
+              </div>
+
+              <div className="text-sm text-slate-400">
+                {participants.length}/{limit} participants
+              </div>
+
+              {plan === "free" && (
+                <div className="bg-slate-900 p-4 rounded-lg border border-amber-500">
+                  <p className="text-sm">
+                    Free plan allows only 8 participants.
+                  </p>
+
+                  <Button
+                    variant="link"
+                    onClick={() =>
+                      navigate("/upgrade")
+                    }
+                  >
+                    Upgrade Plan
+                  </Button>
                 </div>
               )}
-            </div>
 
-            <div className="flex gap-4">
+              <div className="space-y-2">
+                {participants.map((p) => (
+                  <div
+                    key={p}
+                    className="bg-slate-900 rounded p-2"
+                  >
+                    {p}
+                  </div>
+                ))}
+              </div>
+
               <Button
-                onClick={() => setStep("details")}
-                variant="outline"
-                className="flex-1 border-slate-600 text-white hover:bg-slate-600"
+                onClick={saveParticipants}
+                className="w-full"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                Continue
               </Button>
-              <Button
-                onClick={handleAddParticipants}
-                disabled={participants.length === 0 || addParticipantMutation.isPending}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"
-              >
-                {addParticipantMutation.isPending ? "Adding..." : "Next: Run Draw"}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
+            </CardContent>
           </Card>
         )}
 
-        {/* Step 3: Run Draw */}
-        {step === "draw" && (
-          <Card className="bg-slate-700/50 border-slate-600 p-8 text-center">
-            <Zap className="w-16 h-16 text-amber-400 mx-auto mb-4" />
-            <h2 className="text-3xl font-bold text-white mb-4">Ready to Draw Teams?</h2>
-            <p className="text-slate-400 mb-8">
-              {participants.length} participants are ready. Click below to randomly assign World Cup teams!
-            </p>
+        {step === 3 && (
+          <Card className="bg-slate-800 border-slate-700">
+            <CardHeader>
+              <CardTitle>
+                Step 3 — Run the Draw
+              </CardTitle>
+            </CardHeader>
 
-            <div className="flex gap-4">
+            <CardContent className="space-y-4">
               <Button
-                onClick={() => setStep("participants")}
-                variant="outline"
-                className="flex-1 border-slate-600 text-white hover:bg-slate-600"
+                disabled={drawing}
+                className="w-full bg-amber-400 text-black"
+                onClick={handleDraw}
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                {drawing ? (
+                  <>⚽ Running Draw...</>
+                ) : (
+                  <>
+                    <PlayCircle className="mr-2 h-4 w-4" />
+                    Run The Draw
+                  </>
+                )}
               </Button>
-              <Button
-                onClick={handleExecuteDraw}
-                disabled={executDrawMutation.isPending}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-lg py-6"
-              >
-                {executDrawMutation.isPending ? "Drawing..." : "🎲 Run the Draw"}
-              </Button>
-            </div>
+
+              {!drawing && (
+                <div className="grid md:grid-cols-2 gap-3">
+                  <Button
+                    onClick={() =>
+                      navigate(`/pool/${poolSlug}`)
+                    }
+                  >
+                    View Pool
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      navigate("/dashboard")
+                    }
+                  >
+                    Go To Dashboard
+                  </Button>
+                </div>
+              )}
+            </CardContent>
           </Card>
         )}
       </div>
