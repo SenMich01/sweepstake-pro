@@ -116,11 +116,7 @@ export default function PoolDetail() {
   }
 
   const shareUrl =
-    window.location.origin +
-    "/pool/" +
-    pool.slug +
-    "#" +
-    encodePoolToHash(pool);
+  `${window.location.origin}/pool/${pool.slug}`;
 
   const leaderboard = [...pool.participants].sort(
     (a, b) =>
