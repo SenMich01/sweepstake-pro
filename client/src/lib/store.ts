@@ -2,19 +2,28 @@ import { supabase } from "./supabase";
 
 /* ================= TYPES ================= */
 
-export interface Participant {
+export type Team = {
   id: string;
-  pool_id: string;
   name: string;
+  group: string;
+  flag_emoji: string;
+  points: number;
+  stage: string;
+};
+
+export type Participant = {
+  id: string;
+  name: string;
+  pool_id: string;
   team_id: string | null;
   team_name: string | null;
   team_group: string | null;
   flag_emoji: string | null;
   points: number | null;
   stage: string | null;
-}
+};
 
-export interface Pool {
+export type Pool = {
   id: string;
   slug: string;
   name: string;
@@ -22,15 +31,17 @@ export interface Pool {
   plan: "free" | "pro" | "premium";
   status: "draft" | "active";
   created_at: string;
+  user_id: string | null;
   participants: Participant[];
-}
+};
 
 /* ================= POOLS ================= */
 
 export async function getAllPools(): Promise<Pool[]> {
   const { data, error } = await supabase
     .from("pools")
-    .select("*, participants(*)");
+    .select("*, participants(*)")
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
   return data || [];
@@ -54,7 +65,7 @@ export async function createPool({
 }: {
   name: string;
   organizerName: string;
-  plan?: string;
+  plan?: "free" | "pro" | "premium";
 }) {
   const slug =
     name.toLowerCase().replace(/\s+/g, "-") +
@@ -77,6 +88,15 @@ export async function createPool({
   return data;
 }
 
+export async function deletePool(slug: string) {
+  const { error } = await supabase
+    .from("pools")
+    .delete()
+    .eq("slug", slug);
+
+  if (error) throw error;
+}
+
 /* ================= PARTICIPANTS ================= */
 
 export async function addParticipants(
@@ -88,13 +108,11 @@ export async function addParticipants(
     name,
   }));
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("participants")
-    .insert(rows)
-    .select();
+    .insert(rows);
 
   if (error) throw error;
-  return data;
 }
 
 /* ================= DRAW ================= */
@@ -107,36 +125,45 @@ export async function runDraw(poolId: string) {
 
   if (!participants) return;
 
-  const shuffled = [...participants].sort(
+  const { data: teams } = await supabase
+    .from("teams")
+    .select("*");
+
+  if (!teams) return;
+
+  const shuffled = [...teams].sort(
     () => Math.random() - 0.5
   );
 
-  for (const p of shuffled) {
+  const updates = participants.map((p, i) => {
+    const team = shuffled[i % shuffled.length];
+
+    return {
+      id: p.id,
+      team_id: team.id,
+      team_name: team.name,
+      team_group: team.group,
+      flag_emoji: team.flag_emoji,
+      points: team.points,
+      stage: team.stage,
+    };
+  });
+
+  for (const u of updates) {
     await supabase
       .from("participants")
-      .update({
-        points: Math.floor(Math.random() * 10),
-        stage: "Group Stage",
-      })
-      .eq("id", p.id);
+      .update(u)
+      .eq("id", u.id);
   }
 }
 
-/* ================= HELPERS ================= */
+/* ================= UTILS ================= */
 
-export function getMaxParticipants(plan: string) {
-  if (plan === "pro") return 50;
-  if (plan === "premium") return 9999;
-  return 8;
-}
-
-/* ================= SHARE ENCODING ================= */
-
-export function encodePoolToHash(pool: any) {
+export function encodePoolToHash(pool: Pool) {
   return btoa(JSON.stringify(pool));
 }
 
-export function decodePoolFromHash(hash: string) {
+export function decodePoolFromHash(hash: string): Pool | null {
   try {
     return JSON.parse(atob(hash));
   } catch {
