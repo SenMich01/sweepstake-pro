@@ -11,12 +11,14 @@ import PoolDetail from "./pages/PoolDetail";
 import Upgrade from "./pages/Upgrade";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import QuizGate from "./pages/QuizGate";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path={"/"} component={QuizGate} />
+      <Route path={"/home"} component={Home} />
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/create"} component={CreatePool} />
       <Route path={"/pool/:slug"} component={PoolDetail} />
