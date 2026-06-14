@@ -40,7 +40,9 @@ export default function PoolDetail() {
   const exportPDF = async () => {
     if (!pool) return;
 
-    const { jsPDF } = await import("jspdf");
+    const exportPDF = async () => {
+  toast.info("PDF export coming soon");
+};
 
     const doc = new jsPDF();
 
