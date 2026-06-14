@@ -114,6 +114,11 @@ export async function addParticipants(
 
   if (error) throw error;
 }
+export function getMaxParticipants(plan: "free" | "pro" | "premium") {
+  if (plan === "free") return 8;
+  if (plan === "pro") return 50;
+  return 9999;
+}
 
 /* ================= DRAW ================= */
 
