@@ -28,19 +28,30 @@ export default function QuizGate() {
   const [, navigate] = useLocation();
 
   const [step, setStep] = useState(0);
+  const [done, setDone] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleAnswer = () => {
-    // last question → go to homepage safely
-    if (step === questions.length - 1) {
-      setTimeout(() => {
-        navigate("/"); // safe redirect after render cycle
-      }, 150);
-      return;
-    }
-
-    setStep((prev) => prev + 1);
+    setStep((prev) => {
+      if (prev === questions.length - 1) {
+        setDone(true); // trigger navigation safely
+        return prev;
+      }
+      return prev + 1;
+    });
   };
+
+  // SAFE NAVIGATION (this is the key fix)
+  useEffect(() => {
+    if (done) {
+      const timer = setTimeout(() => {
+        navigate("/");
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [done, navigate]);
 
   useEffect(() => {
     containerRef.current?.scrollIntoView({
