@@ -47,6 +47,28 @@ export default function Home() {
             <span className="text-2xl font-bold text-white">Sweepstake Pro</span>
           </div>
           <div className="flex items-center gap-3">
+            {user ? (
+  <Button
+    variant="outline"
+    onClick={async () => {
+      await supabase.auth.signOut();
+
+      setLocation("/");
+      window.location.reload();
+    }}
+  >
+    Logout
+  </Button>
+) : (
+  <Button
+    variant="outline"
+    onClick={() =>
+      setLocation("/login")
+    }
+  >
+    Login
+  </Button>
+)}
             <button onClick={() => setLocation("/dashboard")} className="text-slate-400 hover:text-white text-sm transition">
               My Pools
             </button>
