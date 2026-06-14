@@ -14,6 +14,7 @@ import Signup from "./pages/Signup";
 import QuizGate from "./pages/QuizGate";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useLocation } from "wouter";
 
 function Router() {
   const [loading, setLoading] = useState(true);
