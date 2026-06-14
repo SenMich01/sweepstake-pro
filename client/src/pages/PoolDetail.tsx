@@ -46,12 +46,11 @@ export default function PoolDetail() {
   if (!pool) return;
 
   const { jsPDF } = await import("jspdf");
-
   const doc = new jsPDF();
 
   const date = new Date().toLocaleDateString();
 
-  /* ---------------- HEADER ---------------- */
+  // HEADER
   doc.setFontSize(20);
   doc.text("Sweepstake Pro", 14, 20);
 
@@ -60,36 +59,31 @@ export default function PoolDetail() {
 
   doc.setFontSize(11);
   doc.text(`Organizer: ${pool.organizerName}`, 14, 42);
-  doc.text(`Created: ${date}`, 14, 50);
+  doc.text(`Date: ${date}`, 14, 50);
 
-  /* ---------------- LINE ---------------- */
   doc.line(14, 55, 195, 55);
 
-  /* ---------------- TABLE HEADER ---------------- */
+  // TABLE HEADER
   let y = 65;
 
   doc.setFontSize(12);
   doc.text("#", 14, y);
-  doc.text("Participant", 25, y);
-  doc.text("Team", 85, y);
+  doc.text("Name", 25, y);
+  doc.text("Team", 80, y);
   doc.text("Group", 140, y);
   doc.text("Pts", 170, y);
 
-  y += 8;
+  y += 10;
 
-  /* ---------------- SORT LEADERBOARD ---------------- */
+  // SORT LEADERBOARD
   const sorted = [...pool.participants].sort(
     (a, b) =>
       (b.assignedTeam?.points ?? 0) -
       (a.assignedTeam?.points ?? 0)
   );
 
-  /* ---------------- ROWS ---------------- */
+  // ROWS
   sorted.forEach((p, index) => {
-    const team = p.assignedTeam;
-
-    const rowHeight = 8;
-
     if (y > 270) {
       doc.addPage();
       y = 20;
@@ -99,13 +93,19 @@ export default function PoolDetail() {
 
     doc.text(String(index + 1), 14, y);
     doc.text(p.name || "-", 25, y);
-    doc.text(team?.name || "Unassigned", 85, y);
-    doc.text(team?.group || "-", 140, y);
-    doc.text(String(team?.points ?? 0), 170, y);
+    doc.text(p.assignedTeam?.name || "Unassigned", 80, y);
+    doc.text(p.assignedTeam?.group || "-", 140, y);
+    doc.text(
+      String(p.assignedTeam?.points ?? 0),
+      170,
+      y
+    );
 
-    y += rowHeight;
+    y += 8;
   });
 
+  doc.save(`${pool.slug}-sweepstake.pdf`);
+};
   /* ---------------- FOOTER ---------------- */
   doc.setFontSize(10);
   doc.text(
