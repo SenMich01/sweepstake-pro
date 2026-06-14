@@ -46,7 +46,7 @@ export default function QuizGate() {
   useEffect(() => {
     if (done) {
       const timer = setTimeout(() => {
-        navigate("/");
+        navigate("/home");;
       }, 200);
 
       return () => clearTimeout(timer);
