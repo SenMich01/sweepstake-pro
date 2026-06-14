@@ -3,10 +3,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useLocation } from "wouter";
 
 const PAYSTACK_PRO_LINK =
-  "https://paystack.com/pay/REPLACE_ME_PRO";
+  "https://paystack.shop/pay/rupgol8wmb";
 
 const PAYSTACK_PREMIUM_LINK =
-  "https://paystack.com/pay/REPLACE_ME_PREMIUM";
+  "https://paystack.shop/pay/971miiuxli";
 
 export default function Upgrade() {
   const [, navigate] = useLocation();
