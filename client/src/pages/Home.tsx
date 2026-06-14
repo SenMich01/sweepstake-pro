@@ -2,6 +2,8 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Trophy, Users, Share2, FileText, Zap, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 const features = [
   { icon: <Zap className="w-6 h-6 text-amber-400" />, title: "Instant Draw", desc: "Randomly assign all 32 World Cup teams in seconds. Fair and automatic." },
@@ -20,6 +22,20 @@ const faqs = [
 
 export default function Home() {
   const [, setLocation] = useLocation();
+
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      setUser(user);
+    }
+
+    loadUser();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
