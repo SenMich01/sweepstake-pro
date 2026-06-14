@@ -114,11 +114,6 @@ export async function addParticipants(
 
   if (error) throw error;
 }
-export function getMaxParticipants(plan: "free" | "pro" | "premium") {
-  if (plan === "free") return 8;
-  if (plan === "pro") return 50;
-  return 9999;
-}
 
 /* ================= DRAW ================= */
 
@@ -173,5 +168,17 @@ export function decodePoolFromHash(hash: string): Pool | null {
     return JSON.parse(atob(hash));
   } catch {
     return null;
+  }
+}
+export function getMaxParticipants(plan: "free" | "pro" | "premium") {
+  switch (plan) {
+    case "free":
+      return 8;
+    case "pro":
+      return 50;
+    case "premium":
+      return 9999;
+    default:
+      return 8;
   }
 }
