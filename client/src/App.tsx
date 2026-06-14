@@ -49,6 +49,7 @@ function Router() {
       <Route path="/create" component={CreatePool} />
       <Route path="/pool/:slug" component={PoolDetail} />
       <Route path="/upgrade" component={Upgrade} />
+      <Route path="/login" component={Login} />
       <Route component={NotFound} />
     </Switch>
   );
