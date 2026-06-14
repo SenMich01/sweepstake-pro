@@ -40,7 +40,7 @@ export default function PoolDetail() {
 
     setPool(found ?? null);
     setLoading(false);
-  } [slug]);
+  } [slug];
 
   const exportPDF = async () => {
   if (!pool) return;
