@@ -3,9 +3,9 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 import {
-  await getAllPools(),
-  await addParticipants(),
-  await runDraw()
+  getAllPools,
+  addParticipants,
+  runDraw
 } from "@/lib/store";
 
 import { supabase } from "@/lib/supabase";
