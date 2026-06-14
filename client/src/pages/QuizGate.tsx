@@ -31,11 +31,15 @@ export default function QuizGate() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleAnswer = () => {
-    if (step < questions.length - 1) {
-      setStep(step + 1);
-    } else {
-      navigate("/");
+    // last question → go to homepage safely
+    if (step === questions.length - 1) {
+      setTimeout(() => {
+        navigate("/"); // safe redirect after render cycle
+      }, 150);
+      return;
     }
+
+    setStep((prev) => prev + 1);
   };
 
   useEffect(() => {
