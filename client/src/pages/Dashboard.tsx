@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
-import { getAllPools, deletePool, Pool } from "@/lib/store";
+import {
+  getAllPools,
+  deletePool,
+  Pool,
+} from "@/lib/store";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,19 +15,41 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
 
   const [pools, setPools] = useState<Pool[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setPools(getAllPools());
+    const load = async () => {
+      try {
+        const data = await getAllPools();
+        setPools(data);
+      } catch (err) {
+        toast.error("Failed to load pools");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, []);
 
-  const remove = (slug: string) => {
-    if (!confirm("Delete?")) return;
+  const removePool = async (slug: string) => {
+    if (!confirm("Delete this pool?")) return;
 
-    deletePool(slug);
-    setPools(getAllPools());
+    await deletePool(slug);
 
-    toast.success("Deleted");
+    const updated = await getAllPools();
+    setPools(updated);
+
+    toast.success("Pool deleted");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        Loading dashboard...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6">
@@ -34,6 +60,8 @@ export default function Dashboard() {
         {pools.length === 0 && (
           <Card className="bg-slate-800">
             <CardContent className="p-10 text-center">
+              <h2>No Pools Yet</h2>
+
               <Button onClick={() => navigate("/create")}>
                 Create Pool
               </Button>
@@ -42,20 +70,26 @@ export default function Dashboard() {
         )}
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {pools.map((p) => (
-            <Card key={p.id} className="bg-slate-800">
+          {pools.map((pool) => (
+            <Card key={pool.id} className="bg-slate-800">
               <CardContent className="p-5 space-y-2">
 
-                <h3 className="font-bold">{p.name}</h3>
-                <p>{p.organizerName}</p>
-                <p>{p.participants.length} participants</p>
+                <h3 className="font-bold">{pool.name}</h3>
+                <p>{pool.organizer_name}</p>
+
+                <p>{pool.participants?.length || 0} participants</p>
 
                 <div className="flex gap-2">
-                  <Button onClick={() => navigate(`/pool/${p.slug}`)}>
+                  <Button
+                    onClick={() => navigate(`/pool/${pool.slug}`)}
+                  >
                     View
                   </Button>
 
-                  <Button variant="destructive" onClick={() => remove(p.slug)}>
+                  <Button
+                    variant="destructive"
+                    onClick={() => removePool(pool.slug)}
+                  >
                     Delete
                   </Button>
                 </div>
