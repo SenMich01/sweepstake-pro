@@ -8,53 +8,84 @@ export default function QuizGate() {
   const [step, setStep] = useState(0);
 
   const questions = [
-    "Who will win the World Cup?",
-    "How many participants in your pool?",
-    "Is this for friends or office?",
-    "Do you want prizes?",
-    "Ready to create your sweepstake?"
+    {
+      q: "Who will win the World Cup?",
+      options: ["Brazil", "France", "Argentina", "England"]
+    },
+    {
+      q: "How many people are joining your sweepstake?",
+      options: ["1-10", "10-25", "25-50", "50+"]
+    },
+    {
+      q: "Where are you hosting it?",
+      options: ["Office", "Friends group", "Family", "School"]
+    },
+    {
+      q: "Do you want prizes involved?",
+      options: ["Yes", "No", "Maybe"]
+    },
+    {
+      q: "Ready to create your sweepstake?",
+      options: ["Let’s go!", "Not yet"]
+    }
   ];
 
-  const isLastStep = step === questions.length - 1;
+  const isLast = step === questions.length - 1;
 
-  const handleNext = () => {
-    if (isLastStep) {
-      // ✅ IMPORTANT: navigate AFTER state completes
-      navigate("/home"); // or "/dashboard" if that's your main page
+  const next = () => {
+    if (isLast) {
+      navigate("/home");
       return;
     }
-
-    setStep((prev) => prev + 1);
+    setStep((s) => s + 1);
   };
 
-  const handleBack = () => {
-    setStep((prev) => Math.max(prev - 1, 0));
+  const back = () => {
+    setStep((s) => Math.max(s - 1, 0));
   };
+
+  const current = questions[step];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-slate-900 text-white flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-slate-900 to-black text-white p-6">
 
-      <Card className="bg-slate-800 w-full max-w-xl">
+      <Card className="w-full max-w-xl bg-slate-800 border border-blue-500/30 shadow-xl">
         <CardContent className="p-6 space-y-6">
 
-          <h1 className="text-xl font-bold">
-            World Cup Sweepstake Builder
+          {/* Progress */}
+          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 transition-all"
+              style={{ width: `${((step + 1) / questions.length) * 100}%` }}
+            />
+          </div>
+
+          {/* Question */}
+          <h1 className="text-xl font-bold text-center">
+            {current.q}
           </h1>
 
-          <p className="text-slate-300">
-            {questions[step]}
-          </p>
+          {/* Options */}
+          <div className="grid gap-3">
+            {current.options.map((opt) => (
+              <button
+                key={opt}
+                className="p-3 rounded-lg bg-slate-700 hover:bg-blue-600 transition"
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
 
-          <div className="flex gap-3">
-            <Button onClick={handleNext}>
-              {isLastStep ? "Start Your Sweepstake" : "Continue"}
+          {/* Controls */}
+          <div className="flex justify-between pt-4">
+            <Button variant="outline" onClick={back} disabled={step === 0}>
+              Back
             </Button>
 
-            {step > 0 && (
-              <Button variant="outline" onClick={handleBack}>
-                Back
-              </Button>
-            )}
+            <Button onClick={next}>
+              {isLast ? "Start Sweepstake" : "Next"}
+            </Button>
           </div>
 
         </CardContent>
