@@ -12,21 +12,42 @@ import Upgrade from "./pages/Upgrade";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import QuizGate from "./pages/QuizGate";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
+  const [loading, setLoading] = useState(true);
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+
+      if (!data.session) {
+        setLocation("/");
+      }
+
+      setLoading(false);
+    };
+
+    checkSession();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        <div className="animate-spin text-3xl">⚽</div>
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      <Route path={"/"} component={QuizGate} />
-      <Route path={"/home"} component={Home} />
-      <Route path={"/dashboard"} component={Dashboard} />
-      <Route path={"/create"} component={CreatePool} />
-      <Route path={"/pool/:slug"} component={PoolDetail} />
-      <Route path={"/upgrade"} component={Upgrade} />
-      <Route path={"/404"} component={NotFound} />
-      <Route path={"/login"} component={Login} />
-      <Route path={"/signup"} component={Signup} />
-      {/* Final fallback route */}
+      <Route path="/" component={Home} />
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/create" component={CreatePool} />
+      <Route path="/pool/:slug" component={PoolDetail} />
+      <Route path="/upgrade" component={Upgrade} />
       <Route component={NotFound} />
     </Switch>
   );
