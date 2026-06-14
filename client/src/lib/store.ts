@@ -1,17 +1,6 @@
 import { supabase } from "./supabase";
 
-/* ---------------- TYPES ---------------- */
-
-export interface Pool {
-  id: string;
-  slug: string;
-  name: string;
-  organizer_name: string;
-  plan: "free" | "pro" | "premium";
-  status: "draft" | "active";
-  created_at: string;
-  participants: Participant[];
-}
+/* ================= TYPES ================= */
 
 export interface Participant {
   id: string;
@@ -25,18 +14,29 @@ export interface Participant {
   stage: string | null;
 }
 
-/* ---------------- POOLS ---------------- */
-
-export async function getAllPools() {
-  const { data, error } = await supabase
-    .from("pools")
-    .select("*");
-
-  if (error) throw error;
-  return data;
+export interface Pool {
+  id: string;
+  slug: string;
+  name: string;
+  organizer_name: string;
+  plan: "free" | "pro" | "premium";
+  status: "draft" | "active";
+  created_at: string;
+  participants: Participant[];
 }
 
-export async function getPoolBySlug(slug: string) {
+/* ================= POOLS ================= */
+
+export async function getAllPools(): Promise<Pool[]> {
+  const { data, error } = await supabase
+    .from("pools")
+    .select("*, participants(*)");
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getPoolBySlug(slug: string): Promise<Pool | null> {
   const { data, error } = await supabase
     .from("pools")
     .select("*, participants(*)")
@@ -46,8 +46,6 @@ export async function getPoolBySlug(slug: string) {
   if (error) return null;
   return data;
 }
-
-/* ---------------- CREATE POOL ---------------- */
 
 export async function createPool({
   name,
@@ -79,7 +77,7 @@ export async function createPool({
   return data;
 }
 
-/* ---------------- PARTICIPANTS ---------------- */
+/* ================= PARTICIPANTS ================= */
 
 export async function addParticipants(
   poolId: string,
@@ -99,56 +97,40 @@ export async function addParticipants(
   return data;
 }
 
-/* ---------------- DRAW ---------------- */
+/* ================= DRAW ================= */
 
 export async function runDraw(poolId: string) {
-  // simple random assignment placeholder
   const { data: participants } = await supabase
     .from("participants")
     .select("*")
     .eq("pool_id", poolId);
 
-  if (!participants) return null;
+  if (!participants) return;
 
   const shuffled = [...participants].sort(
     () => Math.random() - 0.5
   );
 
-  const updates = shuffled.map((p, i) => ({
-    id: p.id,
-    points: Math.floor(Math.random() * 10),
-    stage: "Group Stage",
-  }));
-
-  for (const u of updates) {
+  for (const p of shuffled) {
     await supabase
       .from("participants")
       .update({
-        points: u.points,
-        stage: u.stage,
+        points: Math.floor(Math.random() * 10),
+        stage: "Group Stage",
       })
-      .eq("id", u.id);
+      .eq("id", p.id);
   }
-
-  return true;
 }
 
-/* ---------------- HELPERS ---------------- */
+/* ================= HELPERS ================= */
 
 export function getMaxParticipants(plan: string) {
-  switch (plan) {
-    case "free":
-      return 8;
-    case "pro":
-      return 50;
-    case "premium":
-      return 9999;
-    default:
-      return 8;
-  }
+  if (plan === "pro") return 50;
+  if (plan === "premium") return 9999;
+  return 8;
 }
 
-/* ---------------- HASH ---------------- */
+/* ================= SHARE ENCODING ================= */
 
 export function encodePoolToHash(pool: any) {
   return btoa(JSON.stringify(pool));
