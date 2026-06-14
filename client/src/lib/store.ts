@@ -2,30 +2,49 @@ import { supabase } from "./supabase";
 
 /* ---------------- TYPES ---------------- */
 
-export interface Team {
-  id: string;
-  name: string;
-  group: string;
-  flagEmoji: string;
-  points: number;
-  stage: string;
-}
-
-export interface Participant {
-  id: string;
-  name: string;
-  assignedTeam: Team | null;
-}
-
 export interface Pool {
   id: string;
   slug: string;
   name: string;
-  organizerName: string;
+  organizer_name: string;
   plan: "free" | "pro" | "premium";
   status: "draft" | "active";
-  createdAt: string;
+  created_at: string;
   participants: Participant[];
+}
+
+export interface Participant {
+  id: string;
+  pool_id: string;
+  name: string;
+  team_id: string | null;
+  team_name: string | null;
+  team_group: string | null;
+  flag_emoji: string | null;
+  points: number | null;
+  stage: string | null;
+}
+
+/* ---------------- POOLS ---------------- */
+
+export async function getAllPools() {
+  const { data, error } = await supabase
+    .from("pools")
+    .select("*");
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getPoolBySlug(slug: string) {
+  const { data, error } = await supabase
+    .from("pools")
+    .select("*, participants(*)")
+    .eq("slug", slug)
+    .single();
+
+  if (error) return null;
+  return data;
 }
 
 /* ---------------- CREATE POOL ---------------- */
@@ -37,16 +56,10 @@ export async function createPool({
 }: {
   name: string;
   organizerName: string;
-  plan?: "free" | "pro" | "premium";
+  plan?: string;
 }) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) throw new Error("User not authenticated");
-
   const slug =
-    name.toLowerCase().replace(/[^a-z0-9]+/g, "-") +
+    name.toLowerCase().replace(/\s+/g, "-") +
     "-" +
     Date.now();
 
@@ -58,74 +71,12 @@ export async function createPool({
       organizer_name: organizerName,
       plan,
       status: "draft",
-      user_id: user.id,
     })
     .select()
     .single();
 
   if (error) throw error;
-
   return data;
-}
-
-/* ---------------- GET ALL POOLS (USER ONLY) ---------------- */
-
-export async function getAllPools(): Promise<Pool[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return [];
-
-  const { data, error } = await supabase
-    .from("pools")
-    .select(
-      `
-      *,
-      participants (*)
-    `
-    )
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error(error);
-    return [];
-  }
-
-  return (data || []).map(mapPool);
-}
-
-/* ---------------- GET SINGLE POOL ---------------- */
-
-export async function getPoolBySlug(
-  slug: string
-): Promise<Pool | null> {
-  const { data, error } = await supabase
-    .from("pools")
-    .select(
-      `
-      *,
-      participants (*)
-    `
-    )
-    .eq("slug", slug)
-    .single();
-
-  if (error || !data) return null;
-
-  return mapPool(data);
-}
-
-/* ---------------- DELETE POOL ---------------- */
-
-export async function deletePool(slug: string) {
-  const { error } = await supabase
-    .from("pools")
-    .delete()
-    .eq("slug", slug);
-
-  if (error) throw error;
 }
 
 /* ---------------- PARTICIPANTS ---------------- */
@@ -139,14 +90,50 @@ export async function addParticipants(
     name,
   }));
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("participants")
-    .insert(rows);
+    .insert(rows)
+    .select();
 
   if (error) throw error;
+  return data;
 }
 
-/* ---------------- LIMITS ---------------- */
+/* ---------------- DRAW ---------------- */
+
+export async function runDraw(poolId: string) {
+  // simple random assignment placeholder
+  const { data: participants } = await supabase
+    .from("participants")
+    .select("*")
+    .eq("pool_id", poolId);
+
+  if (!participants) return null;
+
+  const shuffled = [...participants].sort(
+    () => Math.random() - 0.5
+  );
+
+  const updates = shuffled.map((p, i) => ({
+    id: p.id,
+    points: Math.floor(Math.random() * 10),
+    stage: "Group Stage",
+  }));
+
+  for (const u of updates) {
+    await supabase
+      .from("participants")
+      .update({
+        points: u.points,
+        stage: u.stage,
+      })
+      .eq("id", u.id);
+  }
+
+  return true;
+}
+
+/* ---------------- HELPERS ---------------- */
 
 export function getMaxParticipants(plan: string) {
   switch (plan) {
@@ -161,31 +148,16 @@ export function getMaxParticipants(plan: string) {
   }
 }
 
-/* ---------------- MAPPER ---------------- */
+/* ---------------- HASH ---------------- */
 
-function mapPool(pool: any): Pool {
-  return {
-    id: pool.id,
-    slug: pool.slug,
-    name: pool.name,
-    organizerName: pool.organizer_name,
-    plan: pool.plan,
-    status: pool.status,
-    createdAt: pool.created_at,
-    participants:
-      pool.participants?.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        assignedTeam: p.team_name
-          ? {
-              id: p.team_id,
-              name: p.team_name,
-              group: p.team_group,
-              flagEmoji: p.flag_emoji,
-              points: p.points ?? 0,
-              stage: p.stage ?? "",
-            }
-          : null,
-      })) || [],
-  };
+export function encodePoolToHash(pool: any) {
+  return btoa(JSON.stringify(pool));
+}
+
+export function decodePoolFromHash(hash: string) {
+  try {
+    return JSON.parse(atob(hash));
+  } catch {
+    return null;
+  }
 }
