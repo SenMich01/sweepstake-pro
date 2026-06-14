@@ -13,14 +13,13 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const signIn = async () => {
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: window.location.origin + "/dashboard",
       },
     });
 
@@ -35,42 +34,26 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-sky-900 to-white flex items-center justify-center px-4">
-      <Card className="w-full max-w-md bg-white/10 backdrop-blur-xl border border-blue-200/20 shadow-2xl">
-        <CardContent className="p-8 space-y-6">
+    <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-6">
+      <Card className="bg-slate-800 w-full max-w-md">
+        <CardContent className="p-6 space-y-4">
 
-          {/* Header */}
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-white">
-              ⚽ Sweepstake Pro
-            </h1>
-            <p className="text-blue-100 text-sm">
-              Sign in to manage your World Cup pools
-            </p>
-          </div>
+          <h1 className="text-2xl font-bold">Login</h1>
 
-          {/* Form */}
-          <form onSubmit={handleLogin} className="space-y-4">
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="bg-white/90 text-black"
-            />
+          <Input
+            placeholder="Enter email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {loading ? "Sending link..." : "Login with Email"}
-            </Button>
-          </form>
+          <Button
+            onClick={signIn}
+            disabled={loading}
+            className="w-full"
+          >
+            {loading ? "Sending link..." : "Send Magic Link"}
+          </Button>
 
-          <p className="text-xs text-blue-100 text-center">
-            You’ll receive a secure magic link to sign in
-          </p>
         </CardContent>
       </Card>
     </div>
