@@ -3,104 +3,63 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-const questions = [
-  {
-    q: "Who do you think will win the World Cup?",
-    options: ["Brazil", "France", "Argentina", "England"],
-  },
-  {
-    q: "How many participants is ideal?",
-    options: ["8", "16", "32", "Unlimited"],
-  },
-  {
-    q: "Where are you hosting it?",
-    options: ["Office", "Friends group", "School", "Online community"],
-  },
-  {
-    q: "What matters most?",
-    options: ["Fair draw", "Design", "Sharing", "Prizes"],
-  },
-  {
-    q: "Would you upgrade?",
-    options: ["Yes", "Maybe", "No"],
-  },
-];
-
 export default function QuizGate() {
   const [, navigate] = useLocation();
-
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  const current = questions[step];
+  const questions = [
+    "Who will win the World Cup?",
+    "How many participants in your pool?",
+    "Is this for friends or office?",
+    "Do you want prizes?",
+    "Ready to create your sweepstake?"
+  ];
 
-  const select = (opt: string) => {
-    const copy = [...answers];
-    copy[step] = opt;
-    setAnswers(copy);
+  const isLastStep = step === questions.length - 1;
+
+  const handleNext = () => {
+    if (isLastStep) {
+      // ✅ IMPORTANT: navigate AFTER state completes
+      navigate("/home"); // or "/dashboard" if that's your main page
+      return;
+    }
+
+    setStep((prev) => prev + 1);
   };
 
-  const next = () => {
-    if (!answers[step]) return;
-
-    setLoading(true);
-
-    setTimeout(() => {
-      setLoading(false);
-
-      if (step < questions.length - 1) {
-        setStep(step + 1);
-      } else {
-        navigate("/"); // HOME
-      }
-    }, 200);
+  const handleBack = () => {
+    setStep((prev) => Math.max(prev - 1, 0));
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-blue-950 via-sky-900 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-slate-900 text-white flex items-center justify-center p-6">
 
-      <Card className="w-full max-w-2xl bg-white/10 backdrop-blur-xl border border-blue-200/20 text-white">
+      <Card className="bg-slate-800 w-full max-w-xl">
+        <CardContent className="p-6 space-y-6">
 
-        <CardContent className={`p-8 space-y-6 transition-all ${loading ? "opacity-40" : "opacity-100"}`}>
+          <h1 className="text-xl font-bold">
+            World Cup Sweepstake Builder
+          </h1>
 
-          <div className="text-center">
-            <h1 className="text-3xl font-bold">⚽ World Cup Sweepstake</h1>
-            <p className="text-blue-100 text-sm">Answer a few questions</p>
-          </div>
+          <p className="text-slate-300">
+            {questions[step]}
+          </p>
 
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">
-              {step + 1}. {current.q}
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {current.options.map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => select(opt)}
-                  className={`p-3 rounded-lg border ${
-                    answers[step] === opt
-                      ? "bg-blue-500 border-blue-300"
-                      : "bg-white/10 border-white/20"
-                  }`}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center pt-4 border-t border-white/10">
-            <p className="text-sm">{step + 1} / {questions.length}</p>
-
-            <Button onClick={next} disabled={!answers[step]}>
-              {step === questions.length - 1 ? "Enter" : "Next"}
+          <div className="flex gap-3">
+            <Button onClick={handleNext}>
+              {isLastStep ? "Start Your Sweepstake" : "Continue"}
             </Button>
+
+            {step > 0 && (
+              <Button variant="outline" onClick={handleBack}>
+                Back
+              </Button>
+            )}
           </div>
 
         </CardContent>
       </Card>
+
     </div>
   );
 }
