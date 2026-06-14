@@ -20,8 +20,13 @@ export default function Dashboard() {
   const [pools, setPools] = useState<Pool[]>([]);
 
   useEffect(() => {
-    setPools(getAllPools());
-  }, []);
+  async function load() {
+    const pools = await getAllPools();
+    setPools(pools);
+  }
+
+  load();
+}, []);
 
   const removePool = (slug: string) => {
     if (!confirm("Delete this pool?")) return;
