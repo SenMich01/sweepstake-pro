@@ -25,13 +25,18 @@ export default function PoolDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let found = getPoolBySlug(slug);
+  async function load() {
+    if (!slug) return;
 
-    if (!found && window.location.hash) {
-      found = decodePoolFromHash(
-        window.location.hash.slice(1)
-      );
-    }
+    const found =
+      await getPoolBySlug(slug);
+
+    setPool(found);
+    setLoading(false);
+  }
+
+  load();
+}, [slug]);
 
     setPool(found ?? null);
     setLoading(false);
