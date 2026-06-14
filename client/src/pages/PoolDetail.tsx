@@ -9,7 +9,7 @@ import {
 } from "@/lib/store";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function PoolDetail() {
   const { slug } = useParams();
@@ -23,7 +23,9 @@ export default function PoolDetail() {
       let data = await getPoolBySlug(slug);
 
       if (!data && window.location.hash) {
-        data = decodePoolFromHash(window.location.hash.slice(1));
+        data = decodePoolFromHash(
+          window.location.hash.slice(1)
+        );
       }
 
       setPool(data);
@@ -39,138 +41,63 @@ export default function PoolDetail() {
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF();
 
-    doc.setFontSize(20);
     doc.text(pool.name, 20, 20);
-
-    doc.setFontSize(12);
     doc.text(`Organizer: ${pool.organizer_name}`, 20, 30);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 40);
 
-    doc.setFontSize(14);
-    doc.text("Leaderboard", 20, 55);
+    let y = 50;
 
-    let y = 65;
-
-    const sorted = [...pool.participants].sort(
-      (a, b) => (b.points ?? 0) - (a.points ?? 0)
-    );
-
-    sorted.forEach((p, i) => {
+    pool.participants.forEach((p, i) => {
       doc.text(
-        `${i + 1}. ${p.name} - ${p.team_name ?? "No team"} (${p.points ?? 0})`,
+        `${i + 1}. ${p.name} - ${p.team_name ?? "No team"}`,
         20,
         y
       );
-      y += 8;
+      y += 10;
     });
 
-    doc.save(`${pool.slug}-sweepstake.pdf`);
+    doc.save(`${pool.slug}.pdf`);
 
     toast.success("PDF exported");
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white text-3xl">
-        ⚽ Loading...
-      </div>
-    );
-  }
-
-  if (!pool) {
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        <Card className="bg-slate-800">
-          <CardContent className="p-6 text-center">
-            <h2>Pool Not Found</h2>
-            <Button onClick={() => navigate("/create")}>
-              Create Pool
-            </Button>
-          </CardContent>
-        </Card>
+        Loading...
       </div>
     );
-  }
 
-  const shareUrl =
-    window.location.origin + `/pool/${pool.slug}`;
-
-  const whatsapp = `🎉 Sweepstake Live!\n\n${pool.name}\n\nView: ${shareUrl}`;
-
-  const leaderboard = [...pool.participants].sort(
-    (a, b) => (b.points ?? 0) - (a.points ?? 0)
-  );
+  if (!pool)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        <Button onClick={() => navigate("/create")}>
+          Create Pool
+        </Button>
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
 
-        {/* HEADER */}
         <Card className="bg-slate-800">
-          <CardHeader>
-            <CardTitle>{pool.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Organizer: {pool.organizer_name}</p>
-            <p>Participants: {pool.participants.length}</p>
+          <CardContent className="p-4">
+            <h1 className="text-xl">{pool.name}</h1>
+            <p>{pool.organizer_name}</p>
           </CardContent>
         </Card>
 
-        {/* ACTIONS */}
-        <Card className="bg-slate-800">
-          <CardContent className="flex gap-3 flex-wrap">
-            <Button
-              onClick={() => {
-                navigator.clipboard.writeText(shareUrl);
-                toast.success("Copied");
-              }}
-            >
-              Copy Link
-            </Button>
+        <Button onClick={exportPDF}>
+          Export PDF
+        </Button>
 
-            <Button
-              onClick={() =>
-                window.open(
-                  `https://wa.me/?text=${encodeURIComponent(
-                    whatsapp
-                  )}`
-                )
-              }
-            >
-              WhatsApp
-            </Button>
-
-            <Button onClick={exportPDF}>
-              Export PDF
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* LEADERBOARD */}
-        <Card className="bg-slate-800">
-          <CardHeader>
-            <CardTitle>Leaderboard</CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <div className="space-y-2">
-              {leaderboard.map((p, i) => (
-                <div
-                  key={p.id}
-                  className="flex justify-between border-b border-slate-700 py-2"
-                >
-                  <span>
-                    {i + 1}. {p.name}
-                  </span>
-                  <span>
-                    {p.team_name ?? "No team"} • {p.points ?? 0}
-                  </span>
-                </div>
-              ))}
+        <div className="space-y-2">
+          {pool.participants.map((p) => (
+            <div key={p.id} className="p-2 bg-slate-800 rounded">
+              {p.name} — {p.team_name}
             </div>
-          </CardContent>
-        </Card>
-
+          ))}
+        </div>
       </div>
     </div>
   );
