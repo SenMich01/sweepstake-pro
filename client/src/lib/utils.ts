@@ -21,3 +21,11 @@ export function formatCurrency(amount: number | string, currency: string = "USD"
   });
   return formatter.format(num);
 }
+// Add this to client/src/lib/utils.ts
+
+export function getMaxParticipants(plan: "free" | "pro"): number {
+  if (plan === "pro") {
+    return 100; // Pro plan allows up to 100 participants
+  }
+  return 8; // Free plan allows up to 8 participants
+}
