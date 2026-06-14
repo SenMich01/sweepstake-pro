@@ -6,7 +6,6 @@ import {
   createPool,
   addParticipants,
   runDraw,
-  getMaxParticipants,
 } from "@/lib/store";
 
 import { Button } from "@/components/ui/button";
