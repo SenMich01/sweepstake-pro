@@ -3,9 +3,9 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 import {
-  getAllPools,
-  deletePool,
-  Pool,
+  await getAllPools(),
+  await addParticipants(),
+  await runDraw()
 } from "@/lib/store";
 
 import { supabase } from "@/lib/supabase";
@@ -25,24 +25,13 @@ export default function Dashboard() {
   /* ---------------- AUTH + LOAD ---------------- */
 
   useEffect(() => {
-    async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  const load = async () => {
+    const data = await getAllPools();
+    setPools(data);
+  };
 
-      if (!user) {
-        navigate("/login");
-        return;
-      }
-
-      const data = await getAllPools();
-      setPools(data);
-
-      setLoading(false);
-    }
-
-    load();
-  }, []);
+  load();
+}, []);
 
   /* ---------------- DELETE ---------------- */
 
