@@ -9,6 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import CreatePool from "./pages/CreatePool";
 import PoolDetail from "./pages/PoolDetail";
 import Upgrade from "./pages/Upgrade";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -20,6 +22,8 @@ function Router() {
       <Route path={"/pool/:slug"} component={PoolDetail} />
       <Route path={"/upgrade"} component={Upgrade} />
       <Route path={"/404"} component={NotFound} />
+      <Route path={"/login"} component={Login} />
+      <Route path={"/signup"} component={Signup} />
       {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
