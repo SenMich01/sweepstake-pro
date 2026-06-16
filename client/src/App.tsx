@@ -29,7 +29,11 @@ function Router() {
       <Route path="/pool/:slug" component={PoolDetail} />
       <Route path="/upgrade" component={Upgrade} />
       <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
       <Route component={NotFound} />
+     
+
+
     </Switch>
   );
 }
