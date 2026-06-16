@@ -60,7 +60,7 @@ export default function PoolDetail() {
           <CardContent className="p-5">
             <h1 className="text-2xl font-bold">{pool.name}</h1>
             <p>{pool.organizerName}</p>
-            <p>{pool.participants.length} participants</p>
+            <p>{participants?.length || 0} participants</p>
           </CardContent>
         </Card>
 
