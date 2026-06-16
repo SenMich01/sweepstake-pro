@@ -2,7 +2,12 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 // At the top of CreatePool.tsx, add this import:
-import { getMaxParticipants } from "@/lib/utils";
+import {
+  createPool,
+  addParticipants,
+  runDraw,
+  getMaxParticipants,
+} from "@/lib/store";
 
 import {
   createPool,
