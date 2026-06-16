@@ -17,30 +17,8 @@ import { supabase } from "@/lib/supabase";
 import { useLocation } from "wouter";
 
 function Router() {
-  const [loading, setLoading] = useState(true);
-  const [, setLocation] = useLocation();
+  
 
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-
-      if (!data.session) {
-        setLocation("/");
-      }
-
-      setLoading(false);
-    };
-
-    checkSession();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        <div className="animate-spin text-3xl">⚽</div>
-      </div>
-    );
-  }
 
   return (
     <Switch>
