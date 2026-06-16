@@ -3,9 +3,6 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-
 type Pool = {
   id: string;
   slug: string;
@@ -19,28 +16,39 @@ type Pool = {
 export default function Dashboard() {
   const [, navigate] = useLocation();
 
-  const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
-  const [name, setName] = useState("");
-  const [organizer, setOrganizer] = useState("");
+  const [pools, setPools] = useState<Pool[]>([]);
 
-  // LOAD POOLS
+  const [poolName, setPoolName] = useState("");
+  const [organizerName, setOrganizerName] =
+    useState("");
+
   const loadPools = async () => {
-    setLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      navigate("/login");
+      return;
+    }
 
     const { data, error } = await supabase
       .from("pools")
       .select("*")
-      .order("created_at", { ascending: false });
+      .eq("user_id", user.id)
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (error) {
       toast.error(error.message);
-    } else {
-      setPools(data || []);
+      return;
     }
 
+    setPools(data || []);
     setLoading(false);
   };
 
@@ -48,28 +56,39 @@ export default function Dashboard() {
     loadPools();
   }, []);
 
-  // CREATE POOL
-  const createPool = async () => {
-    if (!name || !organizer) {
-      toast.error("Please fill all fields");
+  const handleCreatePool = async () => {
+    if (!poolName || !organizerName) {
+      toast.error("Fill all fields");
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      navigate("/login");
       return;
     }
 
     setCreating(true);
 
     const slug =
-      name.toLowerCase().replace(/\s+/g, "-") +
+      poolName
+        .toLowerCase()
+        .replace(/\s+/g, "-") +
       "-" +
       Date.now();
 
     const { data, error } = await supabase
       .from("pools")
       .insert({
-        name,
-        organizer_name: organizer,
         slug,
+        name: poolName,
+        organizer_name: organizerName,
         plan: "free",
         status: "draft",
+        user_id: user.id,
       })
       .select()
       .single();
@@ -81,18 +100,22 @@ export default function Dashboard() {
       return;
     }
 
-    toast.success("Pool created!");
+    toast.success("Pool created");
 
-    setName("");
-    setOrganizer("");
+    setPoolName("");
+    setOrganizerName("");
 
     navigate(`/pool/${data.slug}`);
   };
 
-  // DELETE POOL
-  const deletePool = async (id: string) => {
-    const confirmDelete = confirm("Delete this pool?");
-    if (!confirmDelete) return;
+  const handleDelete = async (
+    id: string
+  ) => {
+    const confirmed = confirm(
+      "Delete this pool?"
+    );
+
+    if (!confirmed) return;
 
     const { error } = await supabase
       .from("pools")
@@ -105,108 +128,135 @@ export default function Dashboard() {
     }
 
     toast.success("Pool deleted");
+
     loadPools();
   };
 
+  const logout = async () => {
+    await supabase.auth.signOut();
+
+    navigate("/login");
+  };
+
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-950 text-white">
 
-        {/* HEADER */}
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+      <div className="max-w-7xl mx-auto p-6">
 
-        {/* CREATE POOL CARD */}
-        <Card className="bg-slate-800 border-slate-700">
-          <CardContent className="p-4 md:p-6 space-y-4">
-            <h2 className="text-xl font-semibold">
-              Create New Pool
-            </h2>
+        <div className="flex justify-between items-center mb-8">
+
+          <div>
+            <h1 className="text-4xl font-bold">
+              My Pools
+            </h1>
+
+            <p className="text-slate-400">
+              Manage your sweepstakes
+            </p>
+          </div>
+
+          <button
+            onClick={logout}
+            className="bg-red-600 px-4 py-2 rounded-lg"
+          >
+            Logout
+          </button>
+        </div>
+
+        <div className="bg-slate-800 rounded-2xl p-6 mb-8">
+
+          <h2 className="text-2xl font-bold mb-4">
+            Create Pool
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-4">
 
             <input
-              className="w-full p-3 rounded bg-slate-700"
-              placeholder="Pool name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={poolName}
+              onChange={(e) =>
+                setPoolName(e.target.value)
+              }
+              placeholder="Pool Name"
+              className="p-3 rounded-lg bg-slate-700"
             />
 
             <input
-              className="w-full p-3 rounded bg-slate-700"
-              placeholder="Organizer name"
-              value={organizer}
-              onChange={(e) => setOrganizer(e.target.value)}
+              value={organizerName}
+              onChange={(e) =>
+                setOrganizerName(
+                  e.target.value
+                )
+              }
+              placeholder="Organizer Name"
+              className="p-3 rounded-lg bg-slate-700"
             />
+          </div>
 
-            <Button
-              onClick={createPool}
-              disabled={creating}
-              className="bg-amber-500 hover:bg-amber-600 w-full"
-            >
-              {creating ? "Creating..." : "Create Pool"}
-            </Button>
-          </CardContent>
-        </Card>
+          <button
+            onClick={handleCreatePool}
+            disabled={creating}
+            className="mt-4 bg-blue-600 px-6 py-3 rounded-lg"
+          >
+            {creating
+              ? "Creating..."
+              : "Create Pool"}
+          </button>
+        </div>
 
-        {/* LOADING */}
-        {loading && (
-          <p className="text-slate-400">Loading pools...</p>
-        )}
-
-        {/* EMPTY STATE */}
-        {!loading && pools.length === 0 && (
-          <Card className="bg-slate-800">
-            <CardContent className="p-6 text-center text-slate-400">
-              No pools yet. Create your first sweepstake above.
-            </CardContent>
-          </Card>
-        )}
-
-        {/* POOLS GRID */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {pools.map((pool) => (
-            <Card
-              key={pool.id}
-              className="bg-slate-800 border-slate-700"
-            >
-              <CardContent className="p-4 space-y-2">
-
-                <h3 className="font-bold text-lg">
+        {loading ? (
+          <div className="text-center py-10">
+            Loading pools...
+          </div>
+        ) : pools.length === 0 ? (
+          <div className="bg-slate-800 p-8 rounded-2xl text-center">
+            No pools created yet.
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {pools.map((pool) => (
+              <div
+                key={pool.id}
+                className="bg-slate-800 rounded-2xl p-5"
+              >
+                <h3 className="text-xl font-bold">
                   {pool.name}
                 </h3>
 
-                <p className="text-sm text-slate-400">
-                  Organizer: {pool.organizer_name}
+                <p className="text-slate-400 mt-2">
+                  {pool.organizer_name}
                 </p>
 
-                <p className="text-sm text-slate-400">
-                  Plan: {pool.plan}
+                <p className="text-slate-500 text-sm">
+                  {pool.status}
                 </p>
 
-                <p className="text-sm text-slate-400">
-                  Status: {pool.status}
-                </p>
+                <div className="flex gap-2 mt-5">
 
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    className="flex-1"
+                  <button
                     onClick={() =>
-                      navigate(`/pool/${pool.slug}`)
+                      navigate(
+                        `/pool/${pool.slug}`
+                      )
                     }
+                    className="flex-1 bg-blue-600 py-2 rounded-lg"
                   >
-                    View
-                  </Button>
+                    Open
+                  </button>
 
-                  <Button
-                    variant="destructive"
-                    onClick={() => deletePool(pool.id)}
+                  <button
+                    onClick={() =>
+                      handleDelete(pool.id)
+                    }
+                    className="bg-red-600 px-4 rounded-lg"
                   >
                     Delete
-                  </Button>
-                </div>
+                  </button>
 
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
