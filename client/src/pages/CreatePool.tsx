@@ -27,7 +27,7 @@ export default function CreatePool() {
   const [name, setName] = useState("");
   const [organizer, setOrganizer] = useState("");
 
-  const [participants, setParticipants] = useState<string[]>([]);
+  const [participants, setParticipants] = useState<any[]>([]);
   const [input, setInput] = useState("");
 
   const [pool, setPool] = useState<any>(null);
