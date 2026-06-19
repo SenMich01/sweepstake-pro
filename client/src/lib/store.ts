@@ -51,6 +51,8 @@ export async function createPool({
   organizerName,
   plan = "free",
 }: {
+  // plan should reflect the user's real current plan, passed in by the caller
+
   name: string;
   organizerName: string;
   plan?: "free" | "pro" | "premium";
