@@ -35,6 +35,26 @@ export default function Dashboard() {
 
   const [userPlan, setUserPlan] =
     useState<"free" | "pro" | "premium">("free");
+  const loadUserPlan = async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .single();
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  setUserPlan(data?.plan || "free");
+};
 
   const loadPools = async () => {
     try {
