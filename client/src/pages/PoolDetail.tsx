@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import {
   getPoolBySlug,
+  getMaxParticipants,
   Pool,
 } from "@/lib/store";
 
@@ -18,63 +19,91 @@ export default function PoolDetail() {
 
   const [pool, setPool] = useState<Pool | null>(null);
   const [participants, setParticipants] = useState<any[]>([]);
+  const [participantName, setParticipantName] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadPool = async () => {
-      try {
-        if (!slug) {
-          setLoading(false);
-          return;
-        }
+  const loadPool = async () => {
+    if (!slug) return;
 
-        const found = await getPoolBySlug(slug);
+    const found = await getPoolBySlug(slug);
 
-        if (!found) {
-          setLoading(false);
-          return;
-        }
-
-        setPool(found);
-
-        const { data, error } = await supabase
-          .from("participants")
-          .select("*")
-          .eq("pool_id", found.id);
-
-        if (error) {
-          console.error(error);
-        }
-
-        setParticipants(data || []);
-      } catch (err) {
-        console.error(err);
-      }
-
+    if (!found) {
       setLoading(false);
-    };
+      return;
+    }
 
+    setPool(found);
+
+    const { data } = await supabase
+      .from("participants")
+      .select("*")
+      .eq("pool_id", found.id)
+      .order("created_at", {
+        ascending: true,
+      });
+
+    setParticipants(data || []);
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
     loadPool();
   }, [slug]);
+
+  const addParticipant = async () => {
+    if (!pool) return;
+
+    if (!participantName.trim()) {
+      toast.error("Enter participant name");
+      return;
+    }
+
+    const limit = getMaxParticipants(pool.plan);
+
+    if (participants.length >= limit) {
+      toast.error(
+        "Participant limit reached. Upgrade your plan."
+      );
+
+      navigate("/upgrade");
+
+      return;
+    }
+
+    const { error } = await supabase
+      .from("participants")
+      .insert({
+        pool_id: pool.id,
+        name: participantName,
+      });
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    setParticipantName("");
+
+    await loadPool();
+
+    toast.success("Participant added");
+  };
 
   const copyLink = async () => {
     if (!pool) return;
 
-    try {
-      await navigator.clipboard.writeText(
-        `${window.location.origin}/pool/${pool.slug}`
-      );
+    await navigator.clipboard.writeText(
+      `${window.location.origin}/pool/${pool.slug}`
+    );
 
-      toast.success("Pool link copied");
-    } catch {
-      toast.error("Failed to copy link");
-    }
+    toast.success("Link copied");
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
-        Loading pool...
+        Loading...
       </div>
     );
   }
@@ -82,19 +111,7 @@ export default function PoolDetail() {
   if (!pool) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
-        <Card className="bg-slate-800 border-slate-700">
-          <CardContent className="p-6 text-center space-y-4">
-            <h2 className="text-xl font-bold">
-              Pool Not Found
-            </h2>
-
-            <Button
-              onClick={() => navigate("/dashboard")}
-            >
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
+        Pool not found
       </div>
     );
   }
@@ -103,33 +120,60 @@ export default function PoolDetail() {
     <div className="min-h-screen bg-slate-900 text-white p-6">
       <div className="max-w-5xl mx-auto space-y-6">
 
-        <Card className="bg-slate-800 border-slate-700">
-          <CardContent className="p-6 space-y-2">
+        <Card className="bg-slate-800">
+          <CardContent className="p-6">
 
             <h1 className="text-3xl font-bold">
               {pool.name}
             </h1>
 
-            <p className="text-slate-400">
+            <p>
               Organizer: {pool.organizer_name}
             </p>
 
-            <p className="text-slate-400">
+            <p>
               Plan: {pool.plan}
             </p>
 
-            <p className="text-slate-400">
-              Status: {pool.status}
-            </p>
-
-            <p className="text-slate-400">
-              Participants: {participants.length}
+            <p>
+              Participants:
+              {" "}
+              {participants.length}
+              /
+              {getMaxParticipants(pool.plan)}
             </p>
 
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-800 border-slate-700">
+        <Card className="bg-slate-800">
+          <CardContent className="p-6">
+
+            <h2 className="text-xl font-bold mb-4">
+              Add Participant
+            </h2>
+
+            <div className="flex gap-2">
+
+              <input
+                value={participantName}
+                onChange={(e) =>
+                  setParticipantName(e.target.value)
+                }
+                placeholder="Participant name"
+                className="flex-1 p-3 rounded bg-slate-700"
+              />
+
+              <Button onClick={addParticipant}>
+                Add
+              </Button>
+
+            </div>
+
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-800">
           <CardContent className="p-6">
 
             <h2 className="text-xl font-bold mb-4">
@@ -137,21 +181,15 @@ export default function PoolDetail() {
             </h2>
 
             {participants.length === 0 ? (
-              <p className="text-slate-400">
-                No participants yet.
-              </p>
+              <p>No participants yet.</p>
             ) : (
               <div className="space-y-2">
                 {participants.map((participant) => (
                   <div
                     key={participant.id}
-                    className="flex justify-between bg-slate-700 rounded-lg p-3"
+                    className="bg-slate-700 p-3 rounded"
                   >
-                    <span>{participant.name}</span>
-
-                    <span>
-                      {participant.points || 0} pts
-                    </span>
+                    {participant.name}
                   </div>
                 ))}
               </div>
@@ -163,12 +201,14 @@ export default function PoolDetail() {
         <div className="flex gap-3">
 
           <Button onClick={copyLink}>
-            Copy Pool Link
+            Copy Link
           </Button>
 
           <Button
             variant="secondary"
-            onClick={() => navigate("/dashboard")}
+            onClick={() =>
+              navigate("/dashboard")
+            }
           >
             Dashboard
           </Button>
