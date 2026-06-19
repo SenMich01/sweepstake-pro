@@ -4,6 +4,11 @@ import { toast } from "sonner";
 
 import { supabase } from "@/lib/supabase";
 
+import {
+  getMaxPools,
+  getMaxParticipants,
+} from "@/lib/store";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -27,6 +32,9 @@ export default function Dashboard() {
 
   const [name, setName] = useState("");
   const [organizer, setOrganizer] = useState("");
+
+  const [userPlan, setUserPlan] =
+    useState<"free" | "pro" | "premium">("free");
 
   const loadPools = async () => {
     try {
@@ -54,6 +62,17 @@ export default function Dashboard() {
   }, []);
 
   const handleCreatePool = async () => {
+    const maxPools = getMaxPools(userPlan);
+
+    if (pools.length >= maxPools) {
+      toast.error(
+        `Your ${userPlan.toUpperCase()} plan allows ${maxPools} pool(s)`
+      );
+
+      navigate("/upgrade");
+      return;
+    }
+
     if (!name.trim()) {
       toast.error("Enter pool name");
       return;
@@ -81,7 +100,7 @@ export default function Dashboard() {
           slug,
           name,
           organizer_name: organizer,
-          plan: "free",
+          plan: userPlan,
           status: "draft",
         })
         .select()
@@ -128,9 +147,7 @@ export default function Dashboard() {
 
       toast.success("Pool deleted");
     } catch (err: any) {
-      toast.error(
-        err.message || "Delete failed"
-      );
+      toast.error(err.message);
     }
   };
 
@@ -147,6 +164,68 @@ export default function Dashboard() {
             Create and manage your sweepstakes
           </p>
         </div>
+
+        <Card className="bg-slate-800 border-slate-700">
+          <CardContent className="p-6">
+
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="font-bold text-xl">
+                  Current Plan
+                </h2>
+
+                <p className="text-slate-400">
+                  {userPlan.toUpperCase()}
+                </p>
+              </div>
+
+              <Button
+                onClick={() => navigate("/upgrade")}
+              >
+                Upgrade
+              </Button>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+
+              <div className="bg-slate-700 rounded-lg p-4">
+                <div className="text-slate-400">
+                  Pools Used
+                </div>
+
+                <div className="text-2xl font-bold">
+                  {pools.length}/
+                  {getMaxPools(userPlan) === 9999
+                    ? "∞"
+                    : getMaxPools(userPlan)}
+                </div>
+              </div>
+
+              <div className="bg-slate-700 rounded-lg p-4">
+                <div className="text-slate-400">
+                  Participant Limit
+                </div>
+
+                <div className="text-2xl font-bold">
+                  {getMaxParticipants(userPlan) === 9999
+                    ? "Unlimited"
+                    : getMaxParticipants(userPlan)}
+                </div>
+              </div>
+
+              <div className="bg-slate-700 rounded-lg p-4">
+                <div className="text-slate-400">
+                  Plan
+                </div>
+
+                <div className="text-2xl font-bold">
+                  {userPlan.toUpperCase()}
+                </div>
+              </div>
+
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="p-6 space-y-4">
@@ -186,90 +265,71 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {loading && (
-          <Card className="bg-slate-800">
-            <CardContent className="p-6">
-              Loading pools...
-            </CardContent>
-          </Card>
+        {!loading && (
+          <>
+            <h2 className="text-2xl font-bold">
+              My Pools
+            </h2>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+              {pools.map((pool) => (
+                <Card
+                  key={pool.id}
+                  className="bg-slate-800 border-slate-700"
+                >
+                  <CardContent className="p-5 space-y-3">
+
+                    <h3 className="text-xl font-bold">
+                      {pool.name}
+                    </h3>
+
+                    <p className="text-slate-400">
+                      Organizer: {pool.organizer_name}
+                    </p>
+
+                    <p className="text-slate-400">
+                      Plan: {pool.plan}
+                    </p>
+
+                    <p className="text-slate-400">
+                      Status: {pool.status}
+                    </p>
+
+                    <div className="flex gap-2">
+
+                      <Button
+                        className="flex-1"
+                        onClick={() =>
+                          navigate(
+                            `/pool/${pool.slug}`
+                          )
+                        }
+                      >
+                        Open
+                      </Button>
+
+                      <Button
+                        variant="destructive"
+                        onClick={() =>
+                          handleDeletePool(
+                            pool.id,
+                            pool.name
+                          )
+                        }
+                      >
+                        Delete
+                      </Button>
+
+                    </div>
+
+                  </CardContent>
+                </Card>
+              ))}
+
+            </div>
+          </>
         )}
-
-        {!loading &&
-          pools.length === 0 && (
-            <Card className="bg-slate-800">
-              <CardContent className="p-6 text-center">
-                No pools created yet.
-              </CardContent>
-            </Card>
-          )}
-
-        {!loading &&
-          pools.length > 0 && (
-            <>
-              <h2 className="text-2xl font-bold">
-                My Pools
-              </h2>
-
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-
-                {pools.map((pool) => (
-                  <Card
-                    key={pool.id}
-                    className="bg-slate-800 border-slate-700"
-                  >
-                    <CardContent className="p-5 space-y-3">
-
-                      <h3 className="text-xl font-bold">
-                        {pool.name}
-                      </h3>
-
-                      <p className="text-slate-400">
-                        Organizer:{" "}
-                        {pool.organizer_name}
-                      </p>
-
-                      <p className="text-slate-400">
-                        Plan: {pool.plan}
-                      </p>
-
-                      <p className="text-slate-400">
-                        Status: {pool.status}
-                      </p>
-
-                      <div className="flex gap-2 pt-3">
-
-                        <Button
-                          className="flex-1"
-                          onClick={() =>
-                            navigate(
-                              `/pool/${pool.slug}`
-                            )
-                          }
-                        >
-                          Open
-                        </Button>
-
-                        <Button
-                          variant="destructive"
-                          onClick={() =>
-                            handleDeletePool(
-                              pool.id,
-                              pool.name
-                            )
-                          }
-                        >
-                          Delete
-                        </Button>
-
-                      </div>
-
-                    </CardContent>
-                  </Card>
-                ))}
-
-              </div>
-            </>
-          )}
       </div>
     </div>
   );
