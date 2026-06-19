@@ -165,3 +165,15 @@ export function decodePoolFromHash(hash: string) {
     return null;
   }
 }
+export function getMaxPools(plan: string) {
+  switch (plan) {
+    case "premium":
+      return 9999;
+
+    case "pro":
+      return 1;
+
+    default:
+      return 1;
+  }
+}
