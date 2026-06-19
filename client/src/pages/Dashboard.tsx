@@ -78,9 +78,9 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    loadPools();
-  }, []);
-
+  loadUserPlan();
+  loadPools();
+}, []);
   const handleCreatePool = async () => {
     const maxPools = getMaxPools(userPlan);
 
