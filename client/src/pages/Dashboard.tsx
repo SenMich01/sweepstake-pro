@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 import { supabase } from "@/lib/supabase";
-
 import {
   getMaxPools,
   getMaxParticipants,
@@ -35,31 +34,8 @@ export default function Dashboard() {
 
   const [userPlan, setUserPlan] =
     useState<"free" | "pro" | "premium">("free");
+
   const loadUserPlan = async () => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return;
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("plan")
-    .eq("id", user.id)
-    .single();
-
-  if (error) {
-    console.error(error);
-    return;
-  }
-
-  setUserPlan(data?.plan || "free");
-};
-
-  const loadPools = async () => {
-  try {
-    setLoading(true);
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -70,62 +46,64 @@ export default function Dashboard() {
     }
 
     const { data, error } = await supabase
-      .from("pools")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", {
-        ascending: false,
-      });
+      .from("profiles")
+      .select("plan")
+      .eq("id", user.id)
+      .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error(error);
+      return;
+    }
 
-    setPools(data || []);
-  } catch (err: any) {
-    toast.error(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  useEffect(() => {
-  const init = async () => {
-    await loadUserPlan();
-    await loadPools();
+    setUserPlan(
+      (data?.plan as
+        | "free"
+        | "pro"
+        | "premium") || "free"
+    );
   };
 
-  init();
-}, []);
+  const loadPools = async () => {
+    try {
+      setLoading(true);
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  const loadUserPlan = async () => {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/login");
+        return;
+      }
 
-  if (!user) {
-    navigate("/login");
-    return;
-  }
+      const { data, error } = await supabase
+        .from("pools")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", {
+          ascending: false,
+        });
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("plan")
-    .eq("id", user.id)
-    .single();
+      if (error) throw error;
 
-  if (error) {
-    console.error(error);
-    return;
-  }
+      setPools(data || []);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  setUserPlan(
-    (data?.plan as
-      | "free"
-      | "pro"
-      | "premium") || "free"
-  );
-};
-  
+  useEffect(() => {
+    const init = async () => {
+      await loadUserPlan();
+      await loadPools();
+    };
+
+    init();
+  }, []);
+
   const handleCreatePool = async () => {
     const maxPools = getMaxPools(userPlan);
 
@@ -151,6 +129,16 @@ export default function Dashboard() {
     try {
       setCreating(true);
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        toast.error("Please login");
+        navigate("/login");
+        return;
+      }
+
       const slug =
         name
           .toLowerCase()
@@ -162,6 +150,7 @@ export default function Dashboard() {
       const { data, error } = await supabase
         .from("pools")
         .insert({
+          user_id: user.id,
           slug,
           name,
           organizer_name: organizer,
@@ -188,82 +177,37 @@ export default function Dashboard() {
     }
   };
 
-  const handleCreatePool = async () => {
-  const maxPools = getMaxPools(userPlan);
-
-  if (pools.length >= maxPools) {
-    toast.error(
-      `Your ${userPlan.toUpperCase()} plan allows ${maxPools} pool(s)`
+  const handleDeletePool = async (
+    id: string,
+    poolName: string
+  ) => {
+    const confirmed = window.confirm(
+      `Delete "${poolName}"?`
     );
 
-    navigate("/upgrade");
-    return;
-  }
+    if (!confirmed) return;
 
-  if (!name.trim()) {
-    toast.error("Enter pool name");
-    return;
-  }
+    try {
+      const { error } = await supabase
+        .from("pools")
+        .delete()
+        .eq("id", id);
 
-  if (!organizer.trim()) {
-    toast.error("Enter organizer name");
-    return;
-  }
+      if (error) throw error;
 
-  try {
-    setCreating(true);
+      setPools((prev) =>
+        prev.filter((pool) => pool.id !== id)
+      );
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      toast.error("Please login");
-      navigate("/login");
-      return;
+      toast.success("Pool deleted");
+    } catch (err: any) {
+      toast.error(err.message);
     }
+  };
 
-    const slug =
-      name
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "") +
-      "-" +
-      Date.now();
-
-    const { data, error } = await supabase
-      .from("pools")
-      .insert({
-        user_id: user.id,
-        slug,
-        name,
-        organizer_name: organizer,
-        plan: userPlan,
-        status: "draft",
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    toast.success("Pool created");
-
-    setName("");
-    setOrganizer("");
-
-    await loadPools();
-
-    navigate(`/pool/${data.slug}`);
-  } catch (err: any) {
-    toast.error(err.message);
-  } finally {
-    setCreating(false);
-  }
-};
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6">
       <div className="max-w-6xl mx-auto space-y-8">
-
         <div>
           <h1 className="text-4xl font-bold">
             Dashboard
@@ -276,7 +220,6 @@ export default function Dashboard() {
 
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="p-6">
-
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h2 className="font-bold text-xl">
@@ -296,7 +239,6 @@ export default function Dashboard() {
             </div>
 
             <div className="grid md:grid-cols-3 gap-4">
-
               <div className="bg-slate-700 rounded-lg p-4">
                 <div className="text-slate-400">
                   Pools Used
@@ -316,7 +258,8 @@ export default function Dashboard() {
                 </div>
 
                 <div className="text-2xl font-bold">
-                  {getMaxParticipants(userPlan) === 9999
+                  {getMaxParticipants(userPlan) ===
+                  9999
                     ? "Unlimited"
                     : getMaxParticipants(userPlan)}
                 </div>
@@ -331,14 +274,12 @@ export default function Dashboard() {
                   {userPlan.toUpperCase()}
                 </div>
               </div>
-
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="p-6 space-y-4">
-
             <h2 className="text-xl font-bold">
               Create New Pool
             </h2>
@@ -370,7 +311,6 @@ export default function Dashboard() {
                 ? "Creating..."
                 : "Create Pool"}
             </Button>
-
           </CardContent>
         </Card>
 
@@ -381,14 +321,12 @@ export default function Dashboard() {
             </h2>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-
               {pools.map((pool) => (
                 <Card
                   key={pool.id}
                   className="bg-slate-800 border-slate-700"
                 >
                   <CardContent className="p-5 space-y-3">
-
                     <h3 className="text-xl font-bold">
                       {pool.name}
                     </h3>
@@ -406,7 +344,6 @@ export default function Dashboard() {
                     </p>
 
                     <div className="flex gap-2">
-
                       <Button
                         className="flex-1"
                         onClick={() =>
@@ -429,13 +366,10 @@ export default function Dashboard() {
                       >
                         Delete
                       </Button>
-
                     </div>
-
                   </CardContent>
                 </Card>
               ))}
-
             </div>
           </>
         )}
