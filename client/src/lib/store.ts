@@ -140,9 +140,16 @@ export async function runDraw(poolId: string) {
 /* ---------------- FIX FOR YOUR ERROR ---------------- */
 
 export function getMaxParticipants(plan: string) {
-  if (plan === "free") return 8;
-  if (plan === "pro") return 50;
-  return 9999;
+  switch (plan) {
+    case "pro":
+      return 50;
+
+    case "premium":
+      return 9999;
+
+    default:
+      return 8;
+  }
 }
 
 /* ---------------- OPTIONAL ENCODE/DECODE ---------------- */
