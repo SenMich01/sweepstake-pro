@@ -1,53 +1,46 @@
 import { supabase } from "./supabase";
 
-/* ---------------- TYPES ---------------- */
-
-export interface Team {
-  id: string;
-  name: string;
-  group: string;
-  flagEmoji: string;
-  points: number;
-  stage: string;
-}
-
-export interface Participant {
-  id: string;
-  name: string;
-  team_id?: string | null;
-  team_name?: string | null;
-  team_group?: string | null;
-  flag_emoji?: string | null;
-  points?: number;
-  stage?: string | null;
-}
-
 export interface Pool {
   id: string;
   slug: string;
   name: string;
   organizer_name: string;
   plan: "free" | "pro" | "premium";
-  status: "draft" | "active";
+  status: string;
   created_at: string;
-  user_id?: string | null;
 }
 
-/* ---------------- POOLS ---------------- */
+export interface Participant {
+  id: string;
+  pool_id: string;
+  name: string;
+  points?: number;
+  stage?: string;
+}
 
 export async function getAllPools(): Promise<Pool[]> {
-  const { data } = await supabase.from("pools").select("*");
+  const { data, error } = await supabase
+    .from("pools")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
   return data || [];
 }
 
-export async function getPoolBySlug(slug: string): Promise<Pool | null> {
-  const { data } = await supabase
+export async function getPoolBySlug(
+  slug: string
+): Promise<Pool | null> {
+  const { data, error } = await supabase
     .from("pools")
     .select("*")
     .eq("slug", slug)
     .single();
 
-  return data || null;
+  if (error) return null;
+
+  return data;
 }
 
 export async function createPool({
@@ -60,7 +53,10 @@ export async function createPool({
   plan?: "free" | "pro" | "premium";
 }) {
   const slug =
-    name.toLowerCase().replace(/\s+/g, "-") +
+    name
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "") +
     "-" +
     Date.now();
 
@@ -77,14 +73,18 @@ export async function createPool({
     .single();
 
   if (error) throw error;
+
   return data;
 }
 
-export async function deletePool(slug: string) {
-  await supabase.from("pools").delete().eq("slug", slug);
-}
+export async function deletePool(id: string) {
+  const { error } = await supabase
+    .from("pools")
+    .delete()
+    .eq("id", id);
 
-/* ---------------- PARTICIPANTS ---------------- */
+  if (error) throw error;
+}
 
 export async function addParticipants(
   poolId: string,
@@ -101,45 +101,57 @@ export async function addParticipants(
     .select();
 
   if (error) throw error;
+
   return data;
 }
 
-/* ---------------- DRAW ---------------- */
-
 export async function runDraw(poolId: string) {
-  const { data: participants } = await supabase
-    .from("participants")
-    .select("*")
-    .eq("pool_id", poolId);
+  const { data: participants, error } =
+    await supabase
+      .from("participants")
+      .select("*")
+      .eq("pool_id", poolId);
 
-  if (!participants) return null;
+  if (error) throw error;
+
+  if (!participants?.length) {
+    throw new Error(
+      "No participants found in this pool"
+    );
+  }
 
   const shuffled = [...participants].sort(
     () => Math.random() - 0.5
   );
 
-  const updated = shuffled.map((p, i) => ({
-    id: p.id,
-    points: Math.floor(Math.random() * 10),
-    stage: i < 8 ? "Quarter" : "Group",
-  }));
-
-  for (const u of updated) {
+  for (let i = 0; i < shuffled.length; i++) {
     await supabase
       .from("participants")
       .update({
-        points: u.points,
-        stage: u.stage,
+        points: Math.floor(
+          Math.random() * 100
+        ),
+        stage:
+          i < 8
+            ? "Quarter Final"
+            : "Group Stage",
       })
-      .eq("id", u.id);
+      .eq("id", shuffled[i].id);
   }
+
+  await supabase
+    .from("pools")
+    .update({
+      status: "active",
+    })
+    .eq("id", poolId);
 
   return true;
 }
 
-/* ---------------- FIX FOR YOUR ERROR ---------------- */
-
-export function getMaxParticipants(plan: string) {
+export function getMaxParticipants(
+  plan: string
+) {
   switch (plan) {
     case "pro":
       return 50;
@@ -152,20 +164,9 @@ export function getMaxParticipants(plan: string) {
   }
 }
 
-/* ---------------- OPTIONAL ENCODE/DECODE ---------------- */
-
-export function encodePoolToHash(pool: any) {
-  return btoa(JSON.stringify(pool));
-}
-
-export function decodePoolFromHash(hash: string) {
-  try {
-    return JSON.parse(atob(hash));
-  } catch {
-    return null;
-  }
-}
-export function getMaxPools(plan: string) {
+export function getMaxPools(
+  plan: string
+) {
   switch (plan) {
     case "premium":
       return 9999;
