@@ -57,30 +57,75 @@ export default function Dashboard() {
 };
 
   const loadPools = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const { data, error } = await supabase
-        .from("pools")
-        .select("*")
-        .order("created_at", {
-          ascending: false,
-        });
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      if (error) throw error;
-
-      setPools(data || []);
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
+    if (!user) {
+      navigate("/login");
+      return;
     }
-  };
+
+    const { data, error } = await supabase
+      .from("pools")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) throw error;
+
+    setPools(data || []);
+  } catch (err: any) {
+    toast.error(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
-  loadUserPlan();
-  loadPools();
+  const init = async () => {
+    await loadUserPlan();
+    await loadPools();
+  };
+
+  init();
 }, []);
+
+
+  const loadUserPlan = async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    navigate("/login");
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .single();
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  setUserPlan(
+    (data?.plan as
+      | "free"
+      | "pro"
+      | "premium") || "free"
+  );
+};
+  
   const handleCreatePool = async () => {
     const maxPools = getMaxPools(userPlan);
 
