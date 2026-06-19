@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 
 export interface Pool {
   id: string;
+  user_id: string;
   slug: string;
   name: string;
   organizer_name: string;
@@ -22,7 +23,9 @@ export async function getAllPools(): Promise<Pool[]> {
   const { data, error } = await supabase
     .from("pools")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", {
+      ascending: false,
+    });
 
   if (error) throw error;
 
@@ -60,9 +63,18 @@ export async function createPool({
     "-" +
     Date.now();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User not logged in");
+  }
+
   const { data, error } = await supabase
     .from("pools")
     .insert({
+      user_id: user.id,
       slug,
       name,
       organizer_name: organizerName,
