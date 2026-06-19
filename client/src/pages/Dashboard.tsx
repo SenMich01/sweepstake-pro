@@ -28,6 +28,9 @@ export default function Dashboard() {
   const [creating, setCreating] = useState(false);
 
   const [pools, setPools] = useState<Pool[]>([]);
+  const [participantCounts, setParticipantCounts] = useState<
+    Record<string, number>
+  >({});
 
   const [name, setName] = useState("");
   const [organizer, setOrganizer] = useState("");
@@ -88,11 +91,40 @@ export default function Dashboard() {
       if (error) throw error;
 
       setPools(data || []);
+
+      await loadParticipantCounts(data || []);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadParticipantCounts = async (poolList: Pool[]) => {
+    if (poolList.length === 0) {
+      setParticipantCounts({});
+      return;
+    }
+
+    const poolIds = poolList.map((p) => p.id);
+
+    const { data, error } = await supabase
+      .from("participants")
+      .select("pool_id")
+      .in("pool_id", poolIds);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const counts: Record<string, number> = {};
+
+    (data || []).forEach((row: { pool_id: string }) => {
+      counts[row.pool_id] = (counts[row.pool_id] || 0) + 1;
+    });
+
+    setParticipantCounts(counts);
   };
 
   useEffect(() => {
@@ -199,6 +231,12 @@ export default function Dashboard() {
         prev.filter((pool) => pool.id !== id)
       );
 
+      setParticipantCounts((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+
       toast.success("Pool deleted");
     } catch (err: any) {
       toast.error(err.message);
@@ -254,13 +292,17 @@ export default function Dashboard() {
 
               <div className="bg-slate-700 rounded-lg p-4">
                 <div className="text-slate-400">
-                  Participant Limit
+                  Participants Used
                 </div>
 
                 <div className="text-2xl font-bold">
-                  {getMaxParticipants(userPlan) ===
-                  9999
-                    ? "Unlimited"
+                  {Object.values(participantCounts).reduce(
+                    (sum, n) => sum + n,
+                    0
+                  )}
+                  /
+                  {getMaxParticipants(userPlan) === 9999
+                    ? "∞"
                     : getMaxParticipants(userPlan)}
                 </div>
               </div>
@@ -341,6 +383,14 @@ export default function Dashboard() {
 
                     <p className="text-slate-400">
                       Status: {pool.status}
+                    </p>
+
+                    <p className="text-slate-400">
+                      Participants:{" "}
+                      {participantCounts[pool.id] || 0}/
+                      {getMaxParticipants(pool.plan) === 9999
+                        ? "∞"
+                        : getMaxParticipants(pool.plan)}
                     </p>
 
                     <div className="flex gap-2">
