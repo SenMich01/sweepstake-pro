@@ -21,6 +21,13 @@ type Pool = {
   created_at: string;
 };
 
+type Participant = {
+  id: string;
+  pool_id: string;
+  name: string;
+  payment_status?: string;
+};
+
 export default function Dashboard() {
   const [, navigate] = useLocation();
 
@@ -28,9 +35,14 @@ export default function Dashboard() {
   const [creating, setCreating] = useState(false);
 
   const [pools, setPools] = useState<Pool[]>([]);
-  const [participantCounts, setParticipantCounts] = useState<
-    Record<string, number>
+
+  // Map of poolId -> list of participants for that pool
+  const [participantsByPool, setParticipantsByPool] = useState<
+    Record<string, Participant[]>
   >({});
+
+  // Which pool's participant box is currently expanded
+  const [expandedPoolId, setExpandedPoolId] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [organizer, setOrganizer] = useState("");
@@ -92,7 +104,7 @@ export default function Dashboard() {
 
       setPools(data || []);
 
-      await loadParticipantCounts(data || []);
+      await loadAllParticipants(data || []);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -100,9 +112,11 @@ export default function Dashboard() {
     }
   };
 
-  const loadParticipantCounts = async (poolList: Pool[]) => {
+  // Fetches the FULL participant rows (not just counts) for every pool,
+  // so the participant box can show actual names just like the pool page does.
+  const loadAllParticipants = async (poolList: Pool[]) => {
     if (poolList.length === 0) {
-      setParticipantCounts({});
+      setParticipantsByPool({});
       return;
     }
 
@@ -110,21 +124,23 @@ export default function Dashboard() {
 
     const { data, error } = await supabase
       .from("participants")
-      .select("pool_id")
-      .in("pool_id", poolIds);
+      .select("*")
+      .in("pool_id", poolIds)
+      .order("created_at", { ascending: true });
 
     if (error) {
       console.error(error);
       return;
     }
 
-    const counts: Record<string, number> = {};
+    const grouped: Record<string, Participant[]> = {};
 
-    (data || []).forEach((row: { pool_id: string }) => {
-      counts[row.pool_id] = (counts[row.pool_id] || 0) + 1;
+    (data || []).forEach((row: Participant) => {
+      if (!grouped[row.pool_id]) grouped[row.pool_id] = [];
+      grouped[row.pool_id].push(row);
     });
 
-    setParticipantCounts(counts);
+    setParticipantsByPool(grouped);
   };
 
   useEffect(() => {
@@ -136,12 +152,17 @@ export default function Dashboard() {
     init();
   }, []);
 
+  const toggleParticipantBox = (poolId: string) => {
+    setExpandedPoolId((prev) => (prev === poolId ? null : poolId));
+  };
+
   const handleCreatePool = async () => {
     const maxPools = getMaxPools(userPlan);
 
+    // Hard stop: plan at its pool limit gets sent to pricing.
     if (pools.length >= maxPools) {
       toast.error(
-        `Your ${userPlan.toUpperCase()} plan allows ${maxPools} pool(s)`
+        `Your ${userPlan.toUpperCase()} plan allows ${maxPools} pool(s). Upgrade to create more.`
       );
 
       navigate("/upgrade");
@@ -231,11 +252,13 @@ export default function Dashboard() {
         prev.filter((pool) => pool.id !== id)
       );
 
-      setParticipantCounts((prev) => {
+      setParticipantsByPool((prev) => {
         const next = { ...prev };
         delete next[id];
         return next;
       });
+
+      if (expandedPoolId === id) setExpandedPoolId(null);
 
       toast.success("Pool deleted");
     } catch (err: any) {
@@ -246,14 +269,23 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6">
       <div className="max-w-6xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-4xl font-bold">
-            Dashboard
-          </h1>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold">
+              Dashboard
+            </h1>
 
-          <p className="text-slate-400 mt-2">
-            Create and manage your sweepstakes
-          </p>
+            <p className="text-slate-400 mt-2">
+              Create and manage your sweepstakes
+            </p>
+          </div>
+
+          <Button
+            variant="secondary"
+            onClick={() => navigate("/home")}
+          >
+            Back to Homepage
+          </Button>
         </div>
 
         <Card className="bg-slate-800 border-slate-700">
@@ -296,8 +328,8 @@ export default function Dashboard() {
                 </div>
 
                 <div className="text-2xl font-bold">
-                  {Object.values(participantCounts).reduce(
-                    (sum, n) => sum + n,
+                  {Object.values(participantsByPool).reduce(
+                    (sum, list) => sum + list.length,
                     0
                   )}
                   /
@@ -363,63 +395,103 @@ export default function Dashboard() {
             </h2>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pools.map((pool) => (
-                <Card
-                  key={pool.id}
-                  className="bg-slate-800 border-slate-700"
-                >
-                  <CardContent className="p-5 space-y-3">
-                    <h3 className="text-xl font-bold">
-                      {pool.name}
-                    </h3>
+              {pools.map((pool) => {
+                const poolParticipants =
+                  participantsByPool[pool.id] || [];
+                const limit = getMaxParticipants(pool.plan);
+                const isExpanded = expandedPoolId === pool.id;
 
-                    <p className="text-slate-400">
-                      Organizer: {pool.organizer_name}
-                    </p>
+                return (
+                  <Card
+                    key={pool.id}
+                    className="bg-slate-800 border-slate-700"
+                  >
+                    <CardContent className="p-5 space-y-3">
+                      <h3 className="text-xl font-bold">
+                        {pool.name}
+                      </h3>
 
-                    <p className="text-slate-400">
-                      Plan: {pool.plan}
-                    </p>
+                      <p className="text-slate-400">
+                        Organizer: {pool.organizer_name}
+                      </p>
 
-                    <p className="text-slate-400">
-                      Status: {pool.status}
-                    </p>
+                      <p className="text-slate-400">
+                        Plan: {pool.plan}
+                      </p>
 
-                    <p className="text-slate-400">
-                      Participants:{" "}
-                      {participantCounts[pool.id] || 0}/
-                      {getMaxParticipants(pool.plan) === 9999
-                        ? "∞"
-                        : getMaxParticipants(pool.plan)}
-                    </p>
+                      <p className="text-slate-400">
+                        Status: {pool.status}
+                      </p>
 
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1"
-                        onClick={() =>
-                          navigate(
-                            `/pool/${pool.slug}`
-                          )
-                        }
-                      >
-                        Open
-                      </Button>
+                      <p className="text-slate-400">
+                        Participants: {poolParticipants.length}/
+                        {limit === 9999 ? "∞" : limit}
+                      </p>
 
-                      <Button
-                        variant="destructive"
-                        onClick={() =>
-                          handleDeletePool(
-                            pool.id,
-                            pool.name
-                          )
-                        }
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      {/* Participant box — mirrors the list shown on the pool page */}
+                      <div className="bg-slate-900 rounded-lg border border-slate-700">
+                        <button
+                          onClick={() =>
+                            toggleParticipantBox(pool.id)
+                          }
+                          className="w-full flex justify-between items-center p-3 text-left"
+                        >
+                          <span className="font-semibold">
+                            Participants
+                          </span>
+                          <span className="text-slate-400 text-sm">
+                            {isExpanded ? "Hide" : "Show"}
+                          </span>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="p-3 pt-0 space-y-2 max-h-48 overflow-y-auto">
+                            {poolParticipants.length === 0 ? (
+                              <p className="text-slate-400 text-sm">
+                                No participants yet.
+                              </p>
+                            ) : (
+                              poolParticipants.map((participant) => (
+                                <div
+                                  key={participant.id}
+                                  className="bg-slate-700 p-2 rounded text-sm"
+                                >
+                                  {participant.name}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1"
+                          onClick={() =>
+                            navigate(
+                              `/pool/${pool.slug}`
+                            )
+                          }
+                        >
+                          Open
+                        </Button>
+
+                        <Button
+                          variant="destructive"
+                          onClick={() =>
+                            handleDeletePool(
+                              pool.id,
+                              pool.name
+                            )
+                          }
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </>
         )}
