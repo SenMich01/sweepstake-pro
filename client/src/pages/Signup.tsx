@@ -12,21 +12,56 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async (
-    e: React.FormEvent<HTMLFormElement>
-  ) => {
-    e.preventDefault();
+  e: React.FormEvent<HTMLFormElement>
+) => {
+  e.preventDefault();
 
-    if (!email || !password) {
-      toast.error("Please fill all fields");
-      return;
-    }
+  if (!email || !password) {
+    toast.error("Please fill all fields");
+    return;
+  }
 
-    if (password.length < 6) {
-      toast.error(
-        "Password must be at least 6 characters"
-      );
-      return;
-    }
+  if (password.length < 6) {
+    toast.error(
+      "Password must be at least 6 characters"
+    );
+    return;
+  }
+
+  setLoading(true);
+
+  const { data, error } =
+    await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo:
+          `${window.location.origin}/login`,
+      },
+    });
+
+  if (error) {
+    setLoading(false);
+    toast.error(error.message);
+    return;
+  }
+
+  if (data.user) {
+    await supabase.from("profiles").upsert({
+      id: data.user.id,
+      email: data.user.email,
+      plan: "free",
+    });
+  }
+
+  setLoading(false);
+
+  toast.success(
+    "Account created. Please verify your email."
+  );
+
+  navigate("/login");
+};
 
     setLoading(true);
 
