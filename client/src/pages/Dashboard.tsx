@@ -188,34 +188,78 @@ export default function Dashboard() {
     }
   };
 
-  const handleDeletePool = async (
-    id: string,
-    poolName: string
-  ) => {
-    const confirmed = window.confirm(
-      `Delete "${poolName}"?`
+  const handleCreatePool = async () => {
+  const maxPools = getMaxPools(userPlan);
+
+  if (pools.length >= maxPools) {
+    toast.error(
+      `Your ${userPlan.toUpperCase()} plan allows ${maxPools} pool(s)`
     );
 
-    if (!confirmed) return;
+    navigate("/upgrade");
+    return;
+  }
 
-    try {
-      const { error } = await supabase
-        .from("pools")
-        .delete()
-        .eq("id", id);
+  if (!name.trim()) {
+    toast.error("Enter pool name");
+    return;
+  }
 
-      if (error) throw error;
+  if (!organizer.trim()) {
+    toast.error("Enter organizer name");
+    return;
+  }
 
-      setPools((prev) =>
-        prev.filter((pool) => pool.id !== id)
-      );
+  try {
+    setCreating(true);
 
-      toast.success("Pool deleted");
-    } catch (err: any) {
-      toast.error(err.message);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      toast.error("Please login");
+      navigate("/login");
+      return;
     }
-  };
 
+    const slug =
+      name
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "") +
+      "-" +
+      Date.now();
+
+    const { data, error } = await supabase
+      .from("pools")
+      .insert({
+        user_id: user.id,
+        slug,
+        name,
+        organizer_name: organizer,
+        plan: userPlan,
+        status: "draft",
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    toast.success("Pool created");
+
+    setName("");
+    setOrganizer("");
+
+    await loadPools();
+
+    navigate(`/pool/${data.slug}`);
+  } catch (err: any) {
+    toast.error(err.message);
+  } finally {
+    setCreating(false);
+  }
+};
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6">
       <div className="max-w-6xl mx-auto space-y-8">
