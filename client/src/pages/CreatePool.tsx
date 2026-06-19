@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-// At the top of CreatePool.tsx, add this import:
+
 import {
   createPool,
   addParticipants,
   runDraw,
   getMaxParticipants,
+  getMaxPools,
 } from "@/lib/store";
-
-
+import { supabase } from "@/lib/supabase";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,57 @@ export default function CreatePool() {
   const [pool, setPool] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  const limit = getMaxParticipants("free");
+  const [userPlan, setUserPlan] = useState<
+    "free" | "pro" | "premium"
+  >("free");
+  const [checkingAccess, setCheckingAccess] = useState(true);
+
+  const limit = getMaxParticipants(userPlan);
+
+  // Check the user's real plan AND their current pool count before
+  // letting them get anywhere near pool creation. Free (and any plan
+  // already at its pool limit) gets redirected straight to pricing.
+  useEffect(() => {
+    const checkAccess = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        navigate("/login");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+
+      const plan =
+        (profile?.plan as "free" | "pro" | "premium") || "free";
+      setUserPlan(plan);
+
+      const { count } = await supabase
+        .from("pools")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      const maxPools = getMaxPools(plan);
+
+      if ((count || 0) >= maxPools) {
+        toast.error(
+          `Your ${plan.toUpperCase()} plan allows ${maxPools} pool(s). Upgrade to create more.`
+        );
+        navigate("/upgrade");
+        return;
+      }
+
+      setCheckingAccess(false);
+    };
+
+    checkAccess();
+  }, []);
 
   const handleCreate = async () => {
     if (!name || !organizer) return;
@@ -37,6 +87,7 @@ export default function CreatePool() {
     const newPool = await createPool({
       name,
       organizerName: organizer,
+      plan: userPlan,
     });
 
     setPool(newPool);
@@ -45,8 +96,18 @@ export default function CreatePool() {
   };
 
   const add = () => {
-    if (!input) return;
-    if (participants.length >= limit) return;
+    if (!input.trim()) {
+      toast.error("Enter participant name");
+      return;
+    }
+
+    if (participants.length >= limit) {
+      toast.error(
+        "Participant limit reached. Upgrade your plan."
+      );
+      navigate("/upgrade");
+      return;
+    }
 
     setParticipants([...participants, input]);
     setInput("");
@@ -68,6 +129,14 @@ export default function CreatePool() {
 
     navigate(`/pool/${pool.slug}`);
   };
+
+  if (checkingAccess) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6">
@@ -95,7 +164,8 @@ export default function CreatePool() {
           <Card className="bg-slate-800">
             <CardContent className="p-4 space-y-3">
               <p>
-                {participants.length}/{limit}
+                {participants.length}/
+                {limit === 9999 ? "∞" : limit}
               </p>
 
               <div className="flex gap-2">
