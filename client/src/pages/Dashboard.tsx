@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+
 import { supabase } from "@/lib/supabase";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 type Pool = {
   id: string;
@@ -21,35 +25,28 @@ export default function Dashboard() {
 
   const [pools, setPools] = useState<Pool[]>([]);
 
-  const [poolName, setPoolName] = useState("");
-  const [organizerName, setOrganizerName] =
-    useState("");
+  const [name, setName] = useState("");
+  const [organizer, setOrganizer] = useState("");
 
   const loadPools = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      setLoading(true);
 
-    if (!user) {
-      navigate("/login");
-      return;
+      const { data, error } = await supabase
+        .from("pools")
+        .select("*")
+        .order("created_at", {
+          ascending: false,
+        });
+
+      if (error) throw error;
+
+      setPools(data || []);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
     }
-
-    const { data, error } = await supabase
-      .from("pools")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", {
-        ascending: false,
-      });
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    setPools(data || []);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -57,206 +54,222 @@ export default function Dashboard() {
   }, []);
 
   const handleCreatePool = async () => {
-    if (!poolName || !organizerName) {
-      toast.error("Fill all fields");
+    if (!name.trim()) {
+      toast.error("Enter pool name");
       return;
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      navigate("/login");
+    if (!organizer.trim()) {
+      toast.error("Enter organizer name");
       return;
     }
 
-    setCreating(true);
+    try {
+      setCreating(true);
 
-    const slug =
-      poolName
-        .toLowerCase()
-        .replace(/\s+/g, "-") +
-      "-" +
-      Date.now();
+      const slug =
+        name
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "") +
+        "-" +
+        Date.now();
 
-    const { data, error } = await supabase
-      .from("pools")
-      .insert({
-        slug,
-        name: poolName,
-        organizer_name: organizerName,
-        plan: "free",
-        status: "draft",
-        user_id: user.id,
-      })
-      .select()
-      .single();
+      const { data, error } = await supabase
+        .from("pools")
+        .insert({
+          slug,
+          name,
+          organizer_name: organizer,
+          plan: "free",
+          status: "draft",
+        })
+        .select()
+        .single();
 
-    setCreating(false);
+      if (error) throw error;
 
-    if (error) {
-      toast.error(error.message);
-      return;
+      toast.success("Pool created");
+
+      setName("");
+      setOrganizer("");
+
+      await loadPools();
+
+      navigate(`/pool/${data.slug}`);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setCreating(false);
     }
-
-    toast.success("Pool created");
-
-    setPoolName("");
-    setOrganizerName("");
-
-    navigate(`/pool/${data.slug}`);
   };
 
-  const handleDelete = async (
-    id: string
+  const handleDeletePool = async (
+    id: string,
+    poolName: string
   ) => {
-    const confirmed = confirm(
-      "Delete this pool?"
+    const confirmed = window.confirm(
+      `Delete "${poolName}"?`
     );
 
     if (!confirmed) return;
 
-    const { error } = await supabase
-      .from("pools")
-      .delete()
-      .eq("id", id);
+    try {
+      const { error } = await supabase
+        .from("pools")
+        .delete()
+        .eq("id", id);
 
-    if (error) {
-      toast.error(error.message);
-      return;
+      if (error) throw error;
+
+      setPools((prev) =>
+        prev.filter((pool) => pool.id !== id)
+      );
+
+      toast.success("Pool deleted");
+    } catch (err: any) {
+      toast.error(
+        err.message || "Delete failed"
+      );
     }
-
-    toast.success("Pool deleted");
-
-    loadPools();
-  };
-
-  const logout = async () => {
-    await supabase.auth.signOut();
-
-    navigate("/login");
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-slate-900 text-white p-6">
+      <div className="max-w-6xl mx-auto space-y-8">
 
-      <div className="max-w-7xl mx-auto p-6">
+        <div>
+          <h1 className="text-4xl font-bold">
+            Dashboard
+          </h1>
 
-        <div className="flex justify-between items-center mb-8">
-
-          <div>
-            <h1 className="text-4xl font-bold">
-              My Pools
-            </h1>
-
-            <p className="text-slate-400">
-              Manage your sweepstakes
-            </p>
-          </div>
-
-          <button
-            onClick={logout}
-            className="bg-red-600 px-4 py-2 rounded-lg"
-          >
-            Logout
-          </button>
+          <p className="text-slate-400 mt-2">
+            Create and manage your sweepstakes
+          </p>
         </div>
 
-        <div className="bg-slate-800 rounded-2xl p-6 mb-8">
+        <Card className="bg-slate-800 border-slate-700">
+          <CardContent className="p-6 space-y-4">
 
-          <h2 className="text-2xl font-bold mb-4">
-            Create Pool
-          </h2>
-
-          <div className="grid md:grid-cols-2 gap-4">
+            <h2 className="text-xl font-bold">
+              Create New Pool
+            </h2>
 
             <input
-              value={poolName}
-              onChange={(e) =>
-                setPoolName(e.target.value)
-              }
+              className="w-full rounded-lg bg-slate-700 p-3"
               placeholder="Pool Name"
-              className="p-3 rounded-lg bg-slate-700"
+              value={name}
+              onChange={(e) =>
+                setName(e.target.value)
+              }
             />
 
             <input
-              value={organizerName}
-              onChange={(e) =>
-                setOrganizerName(
-                  e.target.value
-                )
-              }
+              className="w-full rounded-lg bg-slate-700 p-3"
               placeholder="Organizer Name"
-              className="p-3 rounded-lg bg-slate-700"
+              value={organizer}
+              onChange={(e) =>
+                setOrganizer(e.target.value)
+              }
             />
-          </div>
 
-          <button
-            onClick={handleCreatePool}
-            disabled={creating}
-            className="mt-4 bg-blue-600 px-6 py-3 rounded-lg"
-          >
-            {creating
-              ? "Creating..."
-              : "Create Pool"}
-          </button>
-        </div>
+            <Button
+              className="w-full"
+              disabled={creating}
+              onClick={handleCreatePool}
+            >
+              {creating
+                ? "Creating..."
+                : "Create Pool"}
+            </Button>
 
-        {loading ? (
-          <div className="text-center py-10">
-            Loading pools...
-          </div>
-        ) : pools.length === 0 ? (
-          <div className="bg-slate-800 p-8 rounded-2xl text-center">
-            No pools created yet.
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {pools.map((pool) => (
-              <div
-                key={pool.id}
-                className="bg-slate-800 rounded-2xl p-5"
-              >
-                <h3 className="text-xl font-bold">
-                  {pool.name}
-                </h3>
+          </CardContent>
+        </Card>
 
-                <p className="text-slate-400 mt-2">
-                  {pool.organizer_name}
-                </p>
-
-                <p className="text-slate-500 text-sm">
-                  {pool.status}
-                </p>
-
-                <div className="flex gap-2 mt-5">
-
-                  <button
-                    onClick={() =>
-                      navigate(
-                        `/pool/${pool.slug}`
-                      )
-                    }
-                    className="flex-1 bg-blue-600 py-2 rounded-lg"
-                  >
-                    Open
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      handleDelete(pool.id)
-                    }
-                    className="bg-red-600 px-4 rounded-lg"
-                  >
-                    Delete
-                  </button>
-
-                </div>
-              </div>
-            ))}
-          </div>
+        {loading && (
+          <Card className="bg-slate-800">
+            <CardContent className="p-6">
+              Loading pools...
+            </CardContent>
+          </Card>
         )}
+
+        {!loading &&
+          pools.length === 0 && (
+            <Card className="bg-slate-800">
+              <CardContent className="p-6 text-center">
+                No pools created yet.
+              </CardContent>
+            </Card>
+          )}
+
+        {!loading &&
+          pools.length > 0 && (
+            <>
+              <h2 className="text-2xl font-bold">
+                My Pools
+              </h2>
+
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                {pools.map((pool) => (
+                  <Card
+                    key={pool.id}
+                    className="bg-slate-800 border-slate-700"
+                  >
+                    <CardContent className="p-5 space-y-3">
+
+                      <h3 className="text-xl font-bold">
+                        {pool.name}
+                      </h3>
+
+                      <p className="text-slate-400">
+                        Organizer:{" "}
+                        {pool.organizer_name}
+                      </p>
+
+                      <p className="text-slate-400">
+                        Plan: {pool.plan}
+                      </p>
+
+                      <p className="text-slate-400">
+                        Status: {pool.status}
+                      </p>
+
+                      <div className="flex gap-2 pt-3">
+
+                        <Button
+                          className="flex-1"
+                          onClick={() =>
+                            navigate(
+                              `/pool/${pool.slug}`
+                            )
+                          }
+                        >
+                          Open
+                        </Button>
+
+                        <Button
+                          variant="destructive"
+                          onClick={() =>
+                            handleDeletePool(
+                              pool.id,
+                              pool.name
+                            )
+                          }
+                        >
+                          Delete
+                        </Button>
+
+                      </div>
+
+                    </CardContent>
+                  </Card>
+                ))}
+
+              </div>
+            </>
+          )}
       </div>
     </div>
   );
