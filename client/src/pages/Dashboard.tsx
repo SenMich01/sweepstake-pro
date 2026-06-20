@@ -215,14 +215,14 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      toast.success("Pool created");
+      toast.success("Pool created — now add participants");
 
       setName("");
       setOrganizer("");
 
       await loadPools();
 
-      navigate(`/pool/${data.slug}`);
+      navigate(`/create-participants/${data.slug}`);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
