@@ -104,7 +104,31 @@ export async function addParticipants(
   poolId: string,
   names: string[]
 ) {
-  const rows = names.map((name) => ({
+  const { data: pool, error: poolError } = await supabase
+    .from("pools")
+    .select("plan")
+    .eq("id", poolId)
+    .single();
+
+  if (poolError) throw poolError;
+
+  const { count } = await supabase
+    .from("participants")
+    .select("*", { count: "exact", head: true })
+    .eq("pool_id", poolId);
+
+  const limit = getMaxParticipants(pool.plan);
+  const remaining = limit - (count || 0);
+
+  if (remaining <= 0) {
+    throw new Error(
+      `Participant limit reached for this plan (${limit} max).`
+    );
+  }
+
+  const namesToAdd = names.slice(0, remaining);
+
+  const rows = namesToAdd.map((name) => ({
     pool_id: poolId,
     name,
   }));
@@ -115,6 +139,12 @@ export async function addParticipants(
     .select();
 
   if (error) throw error;
+
+  if (namesToAdd.length < names.length) {
+    throw new Error(
+      `Only added ${namesToAdd.length} of ${names.length} — plan limit is ${limit}.`
+    );
+  }
 
   return data;
 }
