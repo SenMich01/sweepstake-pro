@@ -23,6 +23,7 @@ export default function PoolDetail() {
   const [participantName, setParticipantName] = useState("");
   const [loading, setLoading] = useState(true);
   const [drawing, setDrawing] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const loadPool = async () => {
     if (!slug) return;
@@ -36,13 +37,16 @@ export default function PoolDetail() {
 
     setPool(found);
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("participants")
       .select("*")
       .eq("pool_id", found.id)
-      .order("created_at", {
-        ascending: true,
-      });
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error loading participants:", error.message);
+      toast.error("Could not load participants: " + error.message);
+    }
 
     setParticipants(data || []);
 
@@ -54,7 +58,10 @@ export default function PoolDetail() {
   }, [slug]);
 
   const addParticipant = async () => {
-    if (!pool) return;
+    if (!pool) {
+      toast.error("Pool not loaded yet");
+      return;
+    }
 
     if (!participantName.trim()) {
       toast.error("Enter participant name");
@@ -64,24 +71,25 @@ export default function PoolDetail() {
     const limit = getMaxParticipants(pool.plan);
 
     if (participants.length >= limit) {
-      toast.error(
-        "Participant limit reached. Upgrade your plan."
-      );
-
+      toast.error("Participant limit reached. Upgrade your plan.");
       navigate("/upgrade");
-
       return;
     }
 
-    const { error } = await supabase
+    setAdding(true);
+
+    const { data, error } = await supabase
       .from("participants")
       .insert({
         pool_id: pool.id,
-        name: participantName,
-      });
+        name: participantName.trim(),
+      })
+      .select();
+
+    setAdding(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error("Failed to add: " + error.message);
       return;
     }
 
@@ -96,7 +104,7 @@ export default function PoolDetail() {
     if (!pool) return;
 
     if (participants.length === 0) {
-      toast.error("Add participants before running the draw");
+      toast.error("Add at least one participant before running the draw");
       return;
     }
 
@@ -138,74 +146,64 @@ export default function PoolDetail() {
     );
   }
 
+  const limit = getMaxParticipants(pool.plan);
+
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6">
       <div className="max-w-5xl mx-auto space-y-6">
 
         <Card className="bg-slate-800">
           <CardContent className="p-6">
-
-            <h1 className="text-3xl font-bold">
-              {pool.name}
-            </h1>
-
+            <h1 className="text-3xl font-bold">{pool.name}</h1>
+            <p>Organizer: {pool.organizer_name}</p>
+            <p>Plan: {pool.plan}</p>
+            <p>Status: {pool.status}</p>
             <p>
-              Organizer: {pool.organizer_name}
+              Participants: {participants.length}/
+              {limit === 9999 ? "∞" : limit}
             </p>
-
-            <p>
-              Plan: {pool.plan}
-            </p>
-
-            <p>
-              Status: {pool.status}
-            </p>
-
-            <p>
-              Participants:
-              {" "}
-              {participants.length}
-              /
-              {getMaxParticipants(pool.plan)}
-            </p>
-
           </CardContent>
         </Card>
 
         <Card className="bg-slate-800">
           <CardContent className="p-6">
-
-            <h2 className="text-xl font-bold mb-4">
-              Add Participant
-            </h2>
+            <h2 className="text-xl font-bold mb-4">Add Participant</h2>
 
             <div className="flex gap-2">
-
               <input
                 value={participantName}
-                onChange={(e) =>
-                  setParticipantName(e.target.value)
-                }
+                onChange={(e) => setParticipantName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addParticipant();
+                }}
                 placeholder="Participant name"
                 className="flex-1 p-3 rounded bg-slate-700"
               />
 
-              <Button onClick={addParticipant}>
-                Add
+              <Button onClick={addParticipant} disabled={adding}>
+                {adding ? "Adding..." : "Add"}
               </Button>
-
             </div>
 
+            {participants.length >= limit && (
+              <p className="text-orange-400 text-sm mt-2">
+                Limit reached for your {pool.plan} plan.{" "}
+                <button
+                  className="underline"
+                  onClick={() => navigate("/upgrade")}
+                >
+                  Upgrade
+                </button>{" "}
+                to add more.
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card className="bg-slate-800">
           <CardContent className="p-6">
-
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">
-                Participants
-              </h2>
+              <h2 className="text-xl font-bold">Participants</h2>
 
               {pool.status !== "active" && (
                 <Button
@@ -218,7 +216,7 @@ export default function PoolDetail() {
             </div>
 
             {participants.length === 0 ? (
-              <p>No participants yet.</p>
+              <p>No participants yet. Add one above to get started.</p>
             ) : (
               <div className="space-y-2">
                 {participants.map((participant) => (
@@ -240,25 +238,14 @@ export default function PoolDetail() {
                 ))}
               </div>
             )}
-
           </CardContent>
         </Card>
 
         <div className="flex gap-3">
-
-          <Button onClick={copyLink}>
-            Copy Link
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={() =>
-              navigate("/dashboard")
-            }
-          >
+          <Button onClick={copyLink}>Copy Link</Button>
+          <Button variant="secondary" onClick={() => navigate("/dashboard")}>
             Dashboard
           </Button>
-
         </div>
 
       </div>
