@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   getPoolBySlug,
   getMaxParticipants,
+  runDraw,
   Pool,
 } from "@/lib/store";
 
@@ -21,6 +22,7 @@ export default function PoolDetail() {
   const [participants, setParticipants] = useState<any[]>([]);
   const [participantName, setParticipantName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [drawing, setDrawing] = useState(false);
 
   const loadPool = async () => {
     if (!slug) return;
@@ -90,6 +92,26 @@ export default function PoolDetail() {
     toast.success("Participant added");
   };
 
+  const handleRunDraw = async () => {
+    if (!pool) return;
+
+    if (participants.length === 0) {
+      toast.error("Add participants before running the draw");
+      return;
+    }
+
+    try {
+      setDrawing(true);
+      await runDraw(pool.id);
+      toast.success("Draw complete");
+      await loadPool();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to run draw");
+    } finally {
+      setDrawing(false);
+    }
+  };
+
   const copyLink = async () => {
     if (!pool) return;
 
@@ -136,6 +158,10 @@ export default function PoolDetail() {
             </p>
 
             <p>
+              Status: {pool.status}
+            </p>
+
+            <p>
               Participants:
               {" "}
               {participants.length}
@@ -176,9 +202,20 @@ export default function PoolDetail() {
         <Card className="bg-slate-800">
           <CardContent className="p-6">
 
-            <h2 className="text-xl font-bold mb-4">
-              Participants
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">
+                Participants
+              </h2>
+
+              {pool.status !== "active" && (
+                <Button
+                  onClick={handleRunDraw}
+                  disabled={drawing || participants.length === 0}
+                >
+                  {drawing ? "Running Draw..." : "Run Draw"}
+                </Button>
+              )}
+            </div>
 
             {participants.length === 0 ? (
               <p>No participants yet.</p>
@@ -187,9 +224,18 @@ export default function PoolDetail() {
                 {participants.map((participant) => (
                   <div
                     key={participant.id}
-                    className="bg-slate-700 p-3 rounded"
+                    className="bg-slate-700 p-3 rounded flex justify-between items-center"
                   >
-                    {participant.name}
+                    <span>{participant.name}</span>
+
+                    {pool.status === "active" && (
+                      <span className="text-sm text-slate-300">
+                        {participant.stage || "—"}
+                        {typeof participant.points === "number" && (
+                          <> &middot; {participant.points} pts</>
+                        )}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
